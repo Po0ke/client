@@ -33,6 +33,10 @@ public class Recents {
 	public static boolean contains(Mod mod) {
 		return keys.contains(mod.getNameKey());
 	}
+	
+	public static void clear() {
+		keys.clear();
+	}
 
 	public static List<Mod> resolve(ModManager modManager) {
 

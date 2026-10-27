@@ -80,4 +80,9 @@ public class Favourites {
 
 		save();
 	}
+	
+	public static void clear() {
+		keys().clear();
+		save();
+	}
 }

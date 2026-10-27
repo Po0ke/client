@@ -3,6 +3,7 @@ package me.eldodebug.soar.gui.modmenu.category.impl;
 import java.awt.*;
 import java.util.ArrayList;
 
+import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.AdvancedScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.ClickTriplerScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.GeneralScene;
 import org.lwjgl.input.Keyboard;
@@ -44,6 +45,8 @@ public class SettingCategory extends Category {
 		if(ClickTripler.isSupported()) {
 			scenes.add(new ClickTriplerScene(this));
 		}
+		
+		scenes.add(new AdvancedScene(this));
 	}
 	
 	@Override

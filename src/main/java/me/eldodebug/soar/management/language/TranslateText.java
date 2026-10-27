@@ -150,6 +150,7 @@ public enum TranslateText {
 	UI_SOUNDS("text.ui.sounds"), UI_SOUNDS_DESCRIPTION("text.ui.sounds.description") ,EXIT_WORLD_SINGLEPLAYER("text.gamemenu.exitworldsingleplayer"), OPEN_MOD_MENU("text.gamemenu.openglidemenu"), EDIT_HUD("text.gamemenu.edithud"), GRADIENT_SIMPLE("text.gradientsimple"), GENERAL("text.general"),  GENERAL_DESCRIPTION("text.general.description"),
 	UI_BLUR("text.ui.blur"), MC_FONT("text.hud.mcfont"), CHANGELOG("text.changelog"), NEWS("text.news"), SEARCH("text.search"),
 	MORPH_CURSOR("text.morphcursor.name"), MORPH_CURSOR_DESCRIPTION("text.morphcursor.description"),
+	ADVANCED("text.advanced"), ADVANCED_DESCRIPTION("text.advanced.description"),
 	CLICK_TRIPLER("text.clicktripler.name"), CLICK_TRIPLER_DESCRIPTION("text.clicktripler.description"),
 	TRIPLER_MIN_DELAY("text.tripler.mindelay"), TRIPLER_MAX_DELAY("text.tripler.maxdelay");
 
