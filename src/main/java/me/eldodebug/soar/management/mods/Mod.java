@@ -16,6 +16,7 @@ public class Mod {
     private TranslateText nameTranslate, descriptionTranslate;
     private boolean toggled, hide;
     private SimpleAnimation animation = new SimpleAnimation();
+    private SimpleAnimation hoverAnimation = new SimpleAnimation();
     private ModCategory category;
     private String alias = "\u200B"; // zerowidth space
     private Boolean restricted = false, allowed = true;
@@ -122,6 +123,10 @@ public class Mod {
 
     public void setCategory(ModCategory category) {
         this.category = category;
+    }
+
+    public SimpleAnimation getHoverAnimation() {
+        return hoverAnimation;
     }
 
     public SimpleAnimation getAnimation() {

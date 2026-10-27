@@ -12,6 +12,7 @@ import me.eldodebug.soar.utils.ColorUtils;
 import me.eldodebug.soar.utils.animation.normal.Animation;
 import me.eldodebug.soar.utils.animation.normal.Direction;
 import me.eldodebug.soar.utils.animation.normal.easing.EaseBackIn;
+import me.eldodebug.soar.utils.mouse.MorphCursor;
 
 public class ClickEffects {
 
@@ -38,8 +39,19 @@ public class ClickEffects {
 		effects.removeAll(removeEffects);
 	}
 	
+	/**
+	 * Ripples out of the centre of whatever the pointer is hovering, so a click on a button reads as
+	 * the button reacting rather than the pointer. Falls back to the raw click point.
+	 */
 	public void addClickEffect(int mouseX, int mouseY) {
-		effects.add(new ClickEffect(mouseX, mouseY));
+		
+		MorphCursor cursor = MorphCursor.getInstance();
+		
+		if(cursor.hasHoverTarget()) {
+			effects.add(new ClickEffect(Math.round(cursor.getHoverCenterX()), Math.round(cursor.getHoverCenterY()), cursor.getHoverSpan() + 5.0F));
+		} else {
+			effects.add(new ClickEffect(mouseX, mouseY, 8.0F));
+		}
 	}
 	
 	public static ClickEffects getInstance() {
@@ -50,10 +62,12 @@ public class ClickEffects {
 		
 		private Animation animation;
 		private int x, y;
+		private float radius;
 		
-		private ClickEffect(int x, int y) {
+		private ClickEffect(int x, int y, float radius) {
 			this.x = x;
 			this.y = y;
+			this.radius = radius;
 			this.animation = new EaseBackIn(650, 1, 0.0F);
 		}
 		
@@ -64,7 +78,7 @@ public class ClickEffects {
 			AccentColor currentColor = instance.getColorManager().getCurrentColor();
 			
 			nvg.setupAndDraw(() -> {
-				nvg.drawArc(x, y, animation.getValueFloat() * 8, 0, 360, 2, ColorUtils.applyAlpha(currentColor.getInterpolateColor(0), (int) (255 - (animation.getValueFloat() * 255))));
+				nvg.drawArc(x, y, animation.getValueFloat() * radius, 0, 360, 2, ColorUtils.applyAlpha(currentColor.getInterpolateColor(0), (int) (255 - (animation.getValueFloat() * 255))));
 			});
 		}
 		

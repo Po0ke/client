@@ -38,3 +38,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### local build toolchain (not sources) ###
+.jdk8/
+.jdk8dl/
+
+### local git push key (never commit private keys) ###
+.ssh-fork/

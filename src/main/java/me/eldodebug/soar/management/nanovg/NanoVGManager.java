@@ -44,6 +44,11 @@ public class NanoVGManager {
 	
 	private HashMap<Integer, NVGColor> colorCache = new HashMap<Integer, NVGColor>();
 	
+	// Text measuring is the most called out of all NanoVG operations in the interface
+	// (every row, label and button measures the same strings every frame).
+	private HashMap<String, Float> textWidthCache = new HashMap<String, Float>();
+	private static final int TEXT_WIDTH_CACHE_LIMIT = 1024;
+	
 	private long nvg;
 	
 	private FontManager fontManager;
@@ -301,6 +306,37 @@ public class NanoVGManager {
 		drawShadow(x, y, width, height, radius, 7);
 	}
 	
+	/**
+	 * Cheap three-pass elevation for cards and popovers. drawShadow grows with a loop of up to
+	 * seven stroked outlines; this stays at three so it can be used on every card in a list.
+	 */
+	public void drawSoftShadow(float x, float y, float width, float height, float radius, int alpha) {
+		
+		for(int i = 1; i <= 3; i++) {
+			float spread = i * 1.4F;
+			drawOutlineRoundedRect(x - spread, y - spread + 1.2F, width + (spread * 2), height + (spread * 2), radius + spread, spread, new Color(0, 0, 0, Math.max(0, alpha / (i + 2))));
+		}
+	}
+	
+	public void drawSoftShadow(float x, float y, float width, float height, float radius) {
+		drawSoftShadow(x, y, width, height, radius, 120);
+	}
+	
+	/**
+	 * Soft radial glow approximated with a few concentric circles. Used as a very low-alpha
+	 * spotlight behind the cursor, so exact falloff does not matter.
+	 */
+	public void drawRadialGlow(float centerX, float centerY, float radius, Color color) {
+		
+		int steps = 4;
+		
+		for(int i = steps; i >= 1; i--) {
+			float stepRadius = radius * i / steps;
+			int alpha = Math.max(0, color.getAlpha() / (i + 1));
+			drawCircle(centerX, centerY, stepRadius, new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
+		}
+	}
+	
 	public void drawGradientShadow(float x, float y, float width, float height, float radius, Color color1, Color color2) {
 		
 		int alpha = 1;
@@ -428,6 +464,14 @@ public class NanoVGManager {
 	
 	public float getTextWidth(String text, float size, Font font) {
 		
+		String key = font.getName() + ':' + size + ':' + text;
+			
+		Float cached = textWidthCache.get(key);
+			
+		if (cached != null) {
+			return cached;
+		}
+		
 	    float[] bounds = new float[4];
 	    
 	    NanoVG.nvgFontSize(nvg, size);
@@ -435,7 +479,15 @@ public class NanoVGManager {
 	    NanoVG.nvgTextBounds(nvg, 0, 0, text, bounds);
 	    NanoVG.nvgTextAlign(nvg, NanoVG.NVG_ALIGN_LEFT | NanoVG.NVG_ALIGN_MIDDLE);
 	    
-	    return bounds[2] - bounds[0];
+	    float width = bounds[2] - bounds[0];
+	    
+	    if (textWidthCache.size() > TEXT_WIDTH_CACHE_LIMIT) {
+	    	textWidthCache.clear();
+	    }
+	    
+	    textWidthCache.put(key, width);
+	    
+	    return width;
 	}
 
 	

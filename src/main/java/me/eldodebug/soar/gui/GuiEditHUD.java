@@ -30,11 +30,23 @@ import org.lwjgl.nanovg.NanoVG;
 
 public class GuiEditHUD extends GuiScreen {
 
+	private static final int GRID_SIZE = 8;
+	private static final float MAX_FLING_SPEED = 900.0F;
+	
 	private Animation introAnimation;
 	private boolean fromModMenu;
 	private boolean snapping, canSnap;
 	private ArrayList<HUDMod> mods;
 	int localMouseX = -1, localMouseY = -1;
+	
+	private final ArrayList<UndoEntry> undoStack = new ArrayList<UndoEntry>();
+	private HUDMod dragTarget;
+	private int dragStartX, dragStartY;
+	private float dragVelocityX, dragVelocityY;
+	private int lastDragMouseX, lastDragMouseY;
+	private HUDMod flingingMod;
+	private float flingVelocityX, flingVelocityY;
+	private long lastFrameNanos;
 	
 	public GuiEditHUD(boolean fromModMenu) {
 		this.fromModMenu = fromModMenu;
@@ -52,6 +64,12 @@ public class GuiEditHUD extends GuiScreen {
 		
 		introAnimation = new EaseBackIn(500, 1.0F, 0F);
 		introAnimation.setDirection(Direction.FORWARDS);
+		
+		dragTarget = null;
+		flingingMod = null;
+		flingVelocityX = 0.0F;
+		flingVelocityY = 0.0F;
+		lastFrameNanos = 0L;
 	}
 	
 	@Override
@@ -66,6 +84,13 @@ public class GuiEditHUD extends GuiScreen {
 		localMouseY = mouseY;
 
 	    snapping = false;
+	    
+		long now = System.nanoTime();
+		float delta = lastFrameNanos == 0L ? 0.016F : (now - lastFrameNanos) / 1_000_000_000F;
+		lastFrameNanos = now;
+		delta = Math.max(0.0F, Math.min(0.05F, delta));
+		
+		updateFling(sr, delta);
 	    
 		if(introAnimation.isDone(Direction.BACKWARDS)) {
 			mc.displayGuiScreen(null);
@@ -127,6 +152,15 @@ public class GuiEditHUD extends GuiScreen {
 					if(m.isDragging()) {
 						m.setX(mouseX + m.getDraggingX());
 						m.setY(mouseY + m.getDraggingY());
+						
+						// Smoothed pointer velocity, used to give a released element a soft throw.
+						if(mouseX != lastDragMouseX || mouseY != lastDragMouseY) {
+							dragVelocityX = (dragVelocityX * 0.6F) + ((mouseX - lastDragMouseX) * 0.4F);
+							dragVelocityY = (dragVelocityY * 0.6F) + ((mouseY - lastDragMouseY) * 0.4F);
+						}
+						
+						lastDragMouseX = mouseX;
+						lastDragMouseY = mouseY;
 					}
 					
 					int modX = m.getX();
@@ -139,13 +173,40 @@ public class GuiEditHUD extends GuiScreen {
 					m.setX(Math.max(0, Math.min(modX, sr.getScaledWidth() - modWidth)));
 					m.setY(Math.max(0, Math.min(modY, sr.getScaledHeight() - modHeight)));
 					
-					if(canSnap) {
+					if(canSnap && m.isDragging()) {
 				        if (MathUtils.isInRange(modX + (modWidth / 2f), halfScreenWidth - snapRange, halfScreenWidth + snapRange)) {
 				            m.setX(halfScreenWidth - (modWidth / 2));
 				        }
 
 				        if (MathUtils.isInRange(modY + (modHeight / 2f), halfScreenHeight - snapRange, halfScreenHeight + snapRange)) {
 				            m.setY(halfScreenHeight - (modHeight / 2));
+				        }
+				        
+				        // Screen edges, so an element can be parked flush without pixel hunting.
+				        if (MathUtils.isInRange(modX, 0, snapRange)) {
+				        	nvg.drawRect(0, 0, 1F, sr.getScaledHeight(), new Color(217, 60, 255));
+				        	m.setX(0);
+				        }
+				        
+				        if (MathUtils.isInRange(modY, 0, snapRange)) {
+				        	nvg.drawRect(0, 0, sr.getScaledWidth(), 1F, new Color(217, 60, 255));
+				        	m.setY(0);
+				        }
+				        
+				        if (MathUtils.isInRange(modX + modWidth, sr.getScaledWidth() - snapRange, sr.getScaledWidth())) {
+				        	nvg.drawRect(sr.getScaledWidth() - 1F, 0, 1F, sr.getScaledHeight(), new Color(217, 60, 255));
+				        	m.setX(sr.getScaledWidth() - modWidth);
+				        }
+				        
+				        if (MathUtils.isInRange(modY + modHeight, sr.getScaledHeight() - snapRange, sr.getScaledHeight())) {
+				        	nvg.drawRect(0, sr.getScaledHeight() - 1F, sr.getScaledWidth(), 1F, new Color(217, 60, 255));
+				        	m.setY(sr.getScaledHeight() - modHeight);
+				        }
+				        
+				        // Hold control for an 8px grid, useful for lining up a row of elements by hand.
+				        if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL)) {
+				        	m.setX(Math.round(m.getX() / (float) GRID_SIZE) * GRID_SIZE);
+				        	m.setY(Math.round(m.getY() / (float) GRID_SIZE) * GRID_SIZE);
 				        }
 					}
 			        
@@ -244,6 +305,20 @@ public class GuiEditHUD extends GuiScreen {
 				}
 				
 				if(isInside) {
+					
+					// A new drag cancels any throw still in flight and records where it started, so
+					// control-z can put the element back.
+					flingingMod = null;
+					flingVelocityX = 0.0F;
+					flingVelocityY = 0.0F;
+					dragTarget = m;
+					dragStartX = m.getX();
+					dragStartY = m.getY();
+					dragVelocityX = 0.0F;
+					dragVelocityY = 0.0F;
+					lastDragMouseX = mouseX;
+					lastDragMouseY = mouseY;
+					
 					m.setDragging(true);
 					m.setDraggingX(m.getX() - mouseX);
 					m.setDraggingY(m.getY() - mouseY);
@@ -257,6 +332,23 @@ public class GuiEditHUD extends GuiScreen {
 	@Override
 	public void mouseReleased(int mouseX, int mouseY, int mouseButton) {
 		
+		if(dragTarget != null) {
+			
+			if(dragTarget.getX() != dragStartX || dragTarget.getY() != dragStartY) {
+				pushUndo(new UndoEntry(dragTarget, dragStartX, dragStartY));
+			}
+			
+			boolean shift = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+			
+			if(mouseButton == 0 && !shift) {
+				flingingMod = dragTarget;
+				flingVelocityX = Math.max(-MAX_FLING_SPEED, Math.min(MAX_FLING_SPEED, dragVelocityX * 60.0F));
+				flingVelocityY = Math.max(-MAX_FLING_SPEED, Math.min(MAX_FLING_SPEED, dragVelocityY * 60.0F));
+			}
+			
+			dragTarget = null;
+		}
+		
 		for(HUDMod m : mods) {
 			m.setDragging(false);
 		}
@@ -266,8 +358,94 @@ public class GuiEditHUD extends GuiScreen {
 		} catch (IOException e) {}
 	}
 	
+	/**
+	 * Glides a released element to a stop. Exponential damping with real delta time, so the throw
+	 * feels the same at 60 and 240 fps.
+	 */
+	private void updateFling(ScaledResolution sr, float delta) {
+		
+		if(flingingMod == null || delta <= 0.0F) {
+			return;
+		}
+		
+		HUDMod m = flingingMod;
+		
+		if(m.isDragging() || !m.isToggled()) {
+			flingingMod = null;
+			return;
+		}
+		
+		float nextX = m.getX() + (flingVelocityX * delta);
+		float nextY = m.getY() + (flingVelocityY * delta);
+		
+		if(nextX <= 0.0F) {
+			nextX = 0.0F;
+			flingVelocityX = -flingVelocityX * 0.3F;
+		}
+		
+		if(nextY <= 0.0F) {
+			nextY = 0.0F;
+			flingVelocityY = -flingVelocityY * 0.3F;
+		}
+		
+		if(nextX + m.getWidth() >= sr.getScaledWidth()) {
+			nextX = sr.getScaledWidth() - m.getWidth();
+			flingVelocityX = -flingVelocityX * 0.3F;
+		}
+		
+		if(nextY + m.getHeight() >= sr.getScaledHeight()) {
+			nextY = sr.getScaledHeight() - m.getHeight();
+			flingVelocityY = -flingVelocityY * 0.3F;
+		}
+		
+		m.setX(Math.round(nextX));
+		m.setY(Math.round(nextY));
+		
+		float damping = (float) Math.exp(-7.0F * delta);
+		
+		flingVelocityX *= damping;
+		flingVelocityY *= damping;
+		
+		if(Math.abs(flingVelocityX) < 20.0F && Math.abs(flingVelocityY) < 20.0F) {
+			flingingMod = null;
+			flingVelocityX = 0.0F;
+			flingVelocityY = 0.0F;
+		}
+	}
+	
+	private void pushUndo(UndoEntry entry) {
+		
+		undoStack.add(entry);
+		
+		while(undoStack.size() > 20) {
+			undoStack.remove(0);
+		}
+	}
+	
+	private void undo() {
+		
+		if(undoStack.isEmpty()) {
+			return;
+		}
+		
+		UndoEntry entry = undoStack.remove(undoStack.size() - 1);
+		
+		entry.mod.setX(entry.x);
+		entry.mod.setY(entry.y);
+		
+		flingingMod = null;
+		flingVelocityX = 0.0F;
+		flingVelocityY = 0.0F;
+	}
+	
 	@Override
 	public void keyTyped(char typedChar, int keyCode) {
+		
+		if(keyCode == Keyboard.KEY_Z && (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL))) {
+			undo();
+			return;
+		}
+		
 		if(keyCode == Keyboard.KEY_ESCAPE) {
 			if(fromModMenu) {
 				mc.displayGuiScreen(Glide.getInstance().getModMenu());
@@ -296,5 +474,17 @@ public class GuiEditHUD extends GuiScreen {
 	@Override
 	public boolean doesGuiPauseGame() {
 		return false;
+	}
+	
+	private static class UndoEntry {
+		
+		private final HUDMod mod;
+		private final int x, y;
+		
+		private UndoEntry(HUDMod mod, int x, int y) {
+			this.mod = mod;
+			this.x = x;
+			this.y = y;
+		}
 	}
 }

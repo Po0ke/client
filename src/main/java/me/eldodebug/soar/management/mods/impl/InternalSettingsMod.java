@@ -28,6 +28,14 @@ public class InternalSettingsMod extends Mod {
 
 	private final BooleanSetting blurSetting = new BooleanSetting(TranslateText.UI_BLUR, this, true);
 
+	private final BooleanSetting morphCursorSetting = new BooleanSetting(TranslateText.MORPH_CURSOR, this, true);
+
+	private final BooleanSetting clickTriplerSetting = new BooleanSetting(TranslateText.CLICK_TRIPLER, this, true);
+
+	private final NumberSetting clickTriplerMinDelay = new NumberSetting(TranslateText.TRIPLER_MIN_DELAY, this, 10, 1, 500, true);
+
+	private final NumberSetting clickTriplerMaxDelay = new NumberSetting(TranslateText.TRIPLER_MAX_DELAY, this, 100, 1, 500, true);
+
 	private final BooleanSetting mcFontSetting = new BooleanSetting(TranslateText.MC_FONT, this, false);
 
 	private final NumberSetting volumeSetting = new NumberSetting(TranslateText.VOLUME, this, 0.8, 0, 1, false);
@@ -87,6 +95,14 @@ public class InternalSettingsMod extends Mod {
 	public ComboSetting getModThemeSetting() {return modThemeSetting;}
 
 	public BooleanSetting getBlurSetting() {return blurSetting;}
+
+	public BooleanSetting getMorphCursorSetting() {return morphCursorSetting;}
+
+	public BooleanSetting getClickTriplerSetting() {return clickTriplerSetting;}
+
+	public NumberSetting getClickTriplerMinDelay() {return clickTriplerMinDelay;}
+
+	public NumberSetting getClickTriplerMaxDelay() {return clickTriplerMaxDelay;}
 
 	public KeybindSetting getModMenuKeybindSetting() {return modMenuKeybindSetting;}
 

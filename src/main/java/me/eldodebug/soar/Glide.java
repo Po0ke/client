@@ -24,6 +24,7 @@ import me.eldodebug.soar.management.event.EventManager;
 import me.eldodebug.soar.management.file.FileManager;
 import me.eldodebug.soar.management.language.LanguageManager;
 import me.eldodebug.soar.management.mods.ModManager;
+import me.eldodebug.soar.management.misc.ClickTripler;
 import me.eldodebug.soar.management.mods.impl.InternalSettingsMod;
 import me.eldodebug.soar.management.nanovg.NanoVGManager;
 import me.eldodebug.soar.management.notification.NotificationManager;
@@ -122,6 +123,12 @@ public class Glide {
 		InternalSettingsMod.getInstance().setToggled(true);
 		clickEffects = new ClickEffects();
 		mc.updateDisplay();
+		
+		// Publish the saved tripler state on startup, so the helper agrees with the client even
+		// if it was started before the game.
+		ClickTripler.sync(InternalSettingsMod.getInstance().getClickTriplerSetting().isToggled(),
+				InternalSettingsMod.getInstance().getClickTriplerMinDelay().getValueInt(),
+				InternalSettingsMod.getInstance().getClickTriplerMaxDelay().getValueInt());
 	}
 	
 	public void stop() {

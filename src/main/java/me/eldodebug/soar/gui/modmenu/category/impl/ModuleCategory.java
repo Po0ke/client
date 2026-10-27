@@ -15,6 +15,8 @@ import me.eldodebug.soar.management.color.palette.ColorType;
 import me.eldodebug.soar.management.language.TranslateText;
 import me.eldodebug.soar.management.mods.Mod;
 import me.eldodebug.soar.management.mods.ModCategory;
+import me.eldodebug.soar.management.misc.Favourites;
+import me.eldodebug.soar.management.misc.Recents;
 import me.eldodebug.soar.management.mods.ModManager;
 import me.eldodebug.soar.management.mods.settings.Setting;
 import me.eldodebug.soar.management.mods.settings.impl.BooleanSetting;
@@ -28,6 +30,7 @@ import me.eldodebug.soar.management.mods.settings.impl.TextSetting;
 import me.eldodebug.soar.management.nanovg.NanoVGManager;
 import me.eldodebug.soar.management.nanovg.font.Fonts;
 import me.eldodebug.soar.management.nanovg.font.LegacyIcon;
+import me.eldodebug.soar.ui.UiTokens;
 import me.eldodebug.soar.ui.comp.Comp;
 import me.eldodebug.soar.ui.comp.impl.CompColorPicker;
 import me.eldodebug.soar.ui.comp.impl.CompComboBox;
@@ -44,6 +47,7 @@ import me.eldodebug.soar.utils.animation.normal.Animation;
 import me.eldodebug.soar.utils.animation.normal.Direction;
 import me.eldodebug.soar.utils.animation.normal.other.SmoothStepAnimation;
 import me.eldodebug.soar.utils.animation.simple.SimpleAnimation;
+import me.eldodebug.soar.utils.mouse.MorphCursor;
 import me.eldodebug.soar.utils.mouse.MouseUtils;
 import me.eldodebug.soar.utils.mouse.Scroll;
 
@@ -59,6 +63,18 @@ public class ModuleCategory extends Category {
 	
 	private ArrayList<ModuleSetting> comps = new ArrayList<ModuleSetting>();
 	
+	private static final float ROW_PITCH = 50F;
+	private static final float LIST_TOP = 36F;
+	
+	private final ArrayList<Mod> orderedMods = new ArrayList<Mod>();
+	
+	private Mod pressedMod;
+	private Mod lastClickedMod;
+	private long categoryOpenedAt;
+	
+	private boolean emptyStateVisible;
+	private float clearSearchX, clearSearchY, clearSearchWidth, clearSearchHeight;
+	
 	public ModuleCategory(GuiModMenu parent) {
 		super(parent, TranslateText.MODULE, LegacyIcon.ARCHIVE, true, true);
 	}
@@ -69,6 +85,7 @@ public class ModuleCategory extends Category {
 		openSetting = false;
 		settingAnimation = new SmoothStepAnimation(260, 1.0);
 		settingAnimation.setValue(1.0);
+		categoryOpenedAt = System.currentTimeMillis();
 	}
 
 	@Override
@@ -77,6 +94,9 @@ public class ModuleCategory extends Category {
 		openSetting = false;
 		settingAnimation = new SmoothStepAnimation(260, 1.0);
 		settingAnimation.setValue(1.0);
+		categoryOpenedAt = System.currentTimeMillis();
+		lastClickedMod = null;
+		pressedMod = null;
 	}
 	
 	@Override
@@ -100,6 +120,8 @@ public class ModuleCategory extends Category {
 			this.setCanClose(true);
 			currentMod = null;
 		}
+		
+		boolean settingsInteractive = openSetting && settingAnimation.isDone(Direction.BACKWARDS);
 		
 		nvg.save();
 		nvg.translate((float) -(600 - (settingAnimation.getValue() * 600)), 0);
@@ -126,31 +148,72 @@ public class ModuleCategory extends Category {
 			
 			nvg.drawText(c.getName(), this.getX() + 15 + offsetX + ((textWidth + 20) - textWidth) / 2, this.getY() + offsetY + 1.5F, textColor, 9, Fonts.MEDIUM);
 			
+			MorphCursor.getInstance().hover(this.getX() + 15 + offsetX, this.getY() + offsetY - 3 + scrollValue, textWidth + 20, 16, 6);
+			
 			offsetX+=textWidth + 28;
 		}
 		
 		offsetY = offsetY + 23;
 		
-		for(Mod m : modManager.getMods()) {
-
+		rebuildOrderedMods();
+		
+		long elapsed = System.currentTimeMillis() - categoryOpenedAt;
+		int rowCount = orderedMods.size();
+		
+		emptyStateVisible = false;
+		
+		for(int i = 0; i < rowCount; i++) {
 			
-			if(filterMod(m)) {
-				continue;
-			}
+			Mod m = orderedMods.get(i);
+			
+			offsetY = 36 + (i * ROW_PITCH);
 			
 			if(offsetY + scrollValue + 45 > 0 && offsetY + scrollValue < this.getHeight()) {
 				
-				nvg.drawRoundedRect(this.getX() + 15, this.getY() + offsetY, this.getWidth() - 30, 40, 8, palette.getBackgroundColor(ColorType.DARK));
-				nvg.drawRoundedRect(this.getX() + 21, this.getY() + offsetY + 6, 28, 28, 6, palette.getBackgroundColor(ColorType.NORMAL));
-				if(m.isRestricted()){
-					nvg.drawText(m.getName(), this.getX() + 56, this.getY() + offsetY + 9F, palette.getFontColor(ColorType.DARK), 13, Fonts.MEDIUM);
-					nvg.drawText(m.getDescription(), this.getX() + 56 + (nvg.getTextWidth(m.getName(), 13, Fonts.MEDIUM)) + 5, this.getY() + offsetY + 12, palette.getFontColor(ColorType.NORMAL), 9, Fonts.REGULAR);
-					nvg.drawText(LegacyIcon.INFO, this.getX() + 56, this.getY() + offsetY + 23, new Color(255, 145, 0), 9, Fonts.LEGACYICON);
-					nvg.drawText("This mod may be restricted on some servers", this.getX() + 57 + (nvg.getTextWidth(LegacyIcon.INFO, 9, Fonts.LEGACYICON)) , this.getY() + offsetY + 24, new Color(255, 145, 0), 9, Fonts.REGULAR);
-				} else {
-					nvg.drawText(m.getName(), this.getX() + 56, this.getY() + offsetY + 15F, palette.getFontColor(ColorType.DARK), 13, Fonts.MEDIUM);
-					nvg.drawText(m.getDescription(), this.getX() + 56 + (nvg.getTextWidth(m.getName(), 13, Fonts.MEDIUM)) + 5, this.getY() + offsetY + 17, palette.getFontColor(ColorType.NORMAL), 9, Fonts.REGULAR);
+				float entrance = clamp01((elapsed - Math.min(i, 12) * 12F) / 180F);
+				boolean hovered = MouseUtils.isInside(mouseX, mouseY, this.getX() + 15, this.getY() + offsetY + scrollValue, this.getWidth() - 30, 40);
+				boolean pressed = pressedMod != null && pressedMod.equals(m);
+				
+				m.getHoverAnimation().setAnimation(hovered ? 1.0F : 0.0F, 18);
+				
+				float hover = m.getHoverAnimation().getValue();
+				float rowX = this.getX() + 15;
+				float rowWidth = this.getWidth() - 30;
+				float right = this.getX() + this.getWidth();
+				
+				nvg.save();
+				nvg.setAlpha(0.2F + (0.8F * entrance));
+				nvg.translate(0, (1.0F - entrance) * 10.0F);
+				
+				if(pressed) {
+					nvg.scale(rowX, this.getY() + offsetY, rowWidth, 40, UiTokens.PRESS_SCALE);
 				}
+				
+				nvg.drawRoundedRect(rowX, this.getY() + offsetY, rowWidth, 40, 8, palette.getBackgroundColor(ColorType.DARK));
+				
+				if(hover > 0.01F) {
+					nvg.drawRoundedRect(rowX, this.getY() + offsetY, rowWidth, 40, 8, ColorUtils.applyAlpha(accentColor.getColor1(), (int) (hover * UiTokens.TINT_HOVER)));
+				}
+				
+				nvg.drawRoundedRect(this.getX() + 21, this.getY() + offsetY + 6, 28, 28, 6, palette.getBackgroundColor(ColorType.NORMAL));
+				
+				nvg.drawText(m.getName(), this.getX() + 56, this.getY() + offsetY + 15F, palette.getFontColor(ColorType.DARK), 13, Fonts.MEDIUM);
+				
+				float descriptionX = this.getX() + 56 + (nvg.getTextWidth(m.getName(), 13, Fonts.MEDIUM)) + 5;
+				float descriptionWidth = (right - 104) - descriptionX;
+				
+				if(descriptionWidth > 24) {
+					nvg.drawText(nvg.getLimitText(m.getDescription(), 9, Fonts.REGULAR, descriptionWidth), descriptionX, this.getY() + offsetY + 17, palette.getFontColor(ColorType.NORMAL), 9, Fonts.REGULAR);
+				}
+				
+				if(m.isRestricted()) {
+					nvg.drawText(LegacyIcon.INFO, right - 100, this.getY() + offsetY + 14, new Color(255, 145, 0), 11, Fonts.LEGACYICON);
+				}
+				
+				boolean pinned = Favourites.isPinned(m);
+				
+				nvg.drawText(pinned ? LegacyIcon.STAR_FILL : LegacyIcon.STAR, right - 68, this.getY() + offsetY + 13.5F,
+						pinned ? accentColor.getInterpolateColor() : palette.getFontColor(ColorType.NORMAL), 10, Fonts.LEGACYICON);
 
 				m.getAnimation().setAnimation(m.isToggled() ? 1.0F : 0.0F, 16);
 				
@@ -162,12 +225,22 @@ public class ModuleCategory extends Category {
 				nvg.restore();
 				
 				if(modManager.getSettingsByMod(m) != null) {
-					nvg.drawText(LegacyIcon.SETTINGS, this.getX() + this.getWidth() - 39, this.getY() + offsetY + 13.5F, palette.getFontColor(ColorType.NORMAL), 13, Fonts.LEGACYICON);
+					nvg.drawText(LegacyIcon.SETTINGS, right - 39, this.getY() + offsetY + 13.5F, palette.getFontColor(ColorType.NORMAL), 13, Fonts.LEGACYICON);
+				}
+				
+				nvg.restore();
+				
+				MorphCursor.getInstance().hover(rowX, this.getY() + offsetY + scrollValue, rowWidth, 40, 8);
+				MorphCursor.getInstance().hover(right - 70, this.getY() + offsetY + 11 + scrollValue, 18, 18, 4, pinned ? "Unpin module" : "Pin module");
+				
+				if(modManager.getSettingsByMod(m) != null) {
+					MorphCursor.getInstance().hover(right - 44, this.getY() + offsetY + 9 + scrollValue, 22, 22, 6, "Module settings");
 				}
 			}
-			
-			index++;
-			offsetY+=50;
+		}
+		
+		if(rowCount == 0) {
+			drawEmptyState(nvg, palette, this.getY() + LIST_TOP, scrollValue);
 		}
 		
 		nvg.restore();
@@ -198,8 +271,16 @@ public class ModuleCategory extends Category {
 			
 			nvg.drawRoundedRect(this.getX() + 15, this.getY() + offsetY, this.getWidth() - 30, this.getHeight() - 30, 10, palette.getBackgroundColor(ColorType.DARK));
 			nvg.drawText(LegacyIcon.CHEVRON_LEFT, this.getX() + 25, this.getY() + offsetY + 8, palette.getFontColor(ColorType.DARK), 13, Fonts.LEGACYICON);
+			
+			if(settingsInteractive) {
+				MorphCursor.getInstance().hover(this.getX() + 22, this.getY() + 20, 18, 18, 6);
+			}
 			nvg.drawText(currentMod.getName(), this.getX() + 42, this.getY() + offsetY + 9, palette.getFontColor(ColorType.DARK), 13, Fonts.MEDIUM);
 			nvg.drawText(LegacyIcon.REFRESH, this.getX() + this.getWidth() - 39, this.getY() + offsetY + 7.5F, palette.getFontColor(ColorType.DARK), 13, Fonts.LEGACYICON);
+			
+			if(settingsInteractive) {
+				MorphCursor.getInstance().hover(this.getX() + this.getWidth() - 41, this.getY() + 21, 16, 16, 6);
+			}
 			
 			offsetY = 44;
 			
@@ -211,6 +292,21 @@ public class ModuleCategory extends Category {
 				s.openAnimation.setAnimation(s.openY, 16);
 				
 				nvg.drawText(s.setting.getName(), this.getX() + offsetX + 26, this.getY() + offsetY + 15F + s.openAnimation.getValue(), palette.getFontColor(ColorType.DARK), 10, Fonts.MEDIUM);
+				
+				if(s.setting instanceof KeybindSetting) {
+					
+					String conflict = findKeybindConflict((KeybindSetting) s.setting);
+					
+					if(conflict != null) {
+						
+						float nameWidth = nvg.getTextWidth(s.setting.getName(), 10, Fonts.MEDIUM);
+						float iconX = this.getX() + offsetX + 30 + nameWidth;
+						float iconY = this.getY() + offsetY + 11 + s.openAnimation.getValue();
+						
+						nvg.drawText(LegacyIcon.INFO, iconX, iconY, new Color(255, 145, 0), 8, Fonts.LEGACYICON);
+						MorphCursor.getInstance().hover(iconX - 2, iconY - 4, 11, 12, 3, "Also bound to " + conflict);
+					}
+				}
 				
 				if(s.comp instanceof CompToggleButton) {
 					
@@ -281,6 +377,10 @@ public class ModuleCategory extends Category {
 					soundSelect.setY(this.getY() + offsetY + 11 + s.openAnimation.getValue());
 				}
 				
+				if(settingsInteractive) {
+					hoverComp(s.comp);
+				}
+				
 				s.comp.draw(mouseX, (int) (mouseY - settingScroll.getValue()), partialTicks);
 				
 				offsetX+=194;
@@ -299,7 +399,8 @@ public class ModuleCategory extends Category {
 		
 		nvg.restore();
 		
-		scroll.setMaxScroll((index - (index > 5 ? 5.18F : index)) * 50);
+		int visibleCount = orderedMods.size();
+		scroll.setMaxScroll((visibleCount - (visibleCount > 5 ? 5.18F : visibleCount)) * 50);
 	}
 	
 	@Override
@@ -327,15 +428,26 @@ public class ModuleCategory extends Category {
 			
 			offsetY = offsetY + 23;
 			
-			for(Mod m : modManager.getMods()) {
-				
-				if(filterMod(m)) {
-					continue;
-				}
+			rebuildOrderedMods();
+			
+			if(emptyStateVisible && mouseButton == 0 && MouseUtils.isInside(mouseX, mouseY, clearSearchX, clearSearchY, clearSearchWidth, clearSearchHeight)) {
+				this.getSearchBox().setText("");
+				this.getSearchBox().setFocused(false);
+				scroll.resetAll();
+				return;
+			}
+			
+			for(Mod m : orderedMods) {
 				
 				if(MouseUtils.isInside(mouseX, mouseY, this.getX(), this.getY(), this.getWidth(), this.getHeight()) && mouseButton == 0) {
-					if(MouseUtils.isInside(mouseX, mouseY, this.getX() + 15, this.getY() + offsetY, this.getWidth() - 60, 40)) {
-						m.toggle();
+					
+					if(MouseUtils.isInside(mouseX, mouseY, this.getX() + 15, this.getY() + offsetY, this.getWidth() - 98, 40)) {
+						pressedMod = m;
+						toggleRow(m);
+					}
+					
+					if(MouseUtils.isInside(mouseX, mouseY, this.getX() + this.getWidth() - 70, this.getY() + offsetY + 11, 18, 18)) {
+						Favourites.toggle(m);
 					}
 					
 					if(MouseUtils.isInside(mouseX, mouseY, this.getX() + this.getWidth() - 44, this.getY() + offsetY + 9, 22, 22) && !openSetting) {
@@ -526,6 +638,8 @@ public class ModuleCategory extends Category {
 	@Override
 	public void mouseReleased(int mouseX, int mouseY, int mouseButton) {
 		
+		pressedMod = null;
+		
 		for(ModuleSetting s : comps) {
 			
 			if(MouseUtils.isInside(mouseX, mouseY, this.getX(), this.getY(), this.getWidth(), this.getHeight()) && mouseButton == 0) {
@@ -566,6 +680,223 @@ public class ModuleCategory extends Category {
 		}
 	}
 	
+	/**
+	 * Announces the bounds of a settings component to the cursor overlay. Components are laid out
+	 * inside a translated NanoVG context, so the scroll offset has to be added back here.
+	 */
+	private void hoverComp(Comp comp) {
+		
+		MorphCursor cursor = MorphCursor.getInstance();
+		
+		float x = comp.getX();
+		float y = comp.getY() + settingScroll.getValue();
+		
+		if(comp instanceof CompToggleButton) {
+			
+			float scale = ((CompToggleButton) comp).getScale();
+			cursor.hover(x, y, 34 * scale, 16 * scale, 7 * scale);
+		} else if(comp instanceof CompSlider) {
+			cursor.hover(x - 4, y - 4, (float) ((CompSlider) comp).getWidth() + 8, 12, 4);
+		} else if(comp instanceof CompColorPicker) {
+			
+			float scale = ((CompColorPicker) comp).getScale();
+			float size = 16 * scale;
+			
+			cursor.hover(x + (106 * scale), y, size, size, 4);
+		} else if(comp instanceof CompComboBox || comp instanceof CompKeybind || comp instanceof CompModTextBox) {
+			cursor.hover(x, y, 75, 16, 4);
+		} else if(comp instanceof CompImageSelect || comp instanceof CompSoundSelect) {
+			cursor.hover(x, y, 16, 16, 4);
+		}
+	}
+	
+	/**
+	 * @return a description of the first other setting using the same key, or null
+	 */
+	private String findKeybindConflict(KeybindSetting setting) {
+		
+		int keyCode = setting.getKeyCode();
+		
+		if(keyCode == 0) {
+			return null;
+		}
+		
+		ModManager modManager = Glide.getInstance().getModManager();
+		
+		for(Mod mod : modManager.getMods()) {
+			
+			ArrayList<Setting> list = modManager.getSettingsByMod(mod);
+			
+			if(list == null) {
+				continue;
+			}
+			
+			for(Setting other : list) {
+				
+				if(other == setting || !(other instanceof KeybindSetting)) {
+					continue;
+				}
+				
+				if(((KeybindSetting) other).getKeyCode() == keyCode) {
+					return mod.getName() + " / " + other.getName();
+				}
+			}
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * Opens the settings panel for a module, as if its gear icon had been clicked. Reusing the
+	 * click path keeps the palette, the list and the panel from drifting apart.
+	 */
+	public void openSettings(Mod mod) {
+		
+		if(mod == null) {
+			return;
+		}
+		
+		openSetting = false;
+		currentCategory = ModCategory.ALL;
+		this.getSearchBox().setText("");
+		this.getSearchBox().setFocused(false);
+		this.scroll.resetAll();
+		rebuildOrderedMods();
+		
+		int index = orderedMods.indexOf(mod);
+		
+		if(index < 0) {
+			return;
+		}
+		
+		mouseClicked(this.getX() + this.getWidth() - 33, (int) (this.getY() + LIST_TOP + (index * ROW_PITCH) + 20), 0);
+	}
+	
+	private float clamp01(float value) {
+		return Math.max(0.0F, Math.min(1.0F, value));
+	}
+	
+	/**
+	 * One ordered list feeds both rendering and hit testing, so a row can never be drawn at one
+	 * position and clicked at another.
+	 */
+	private void rebuildOrderedMods() {
+		
+		ModManager modManager = Glide.getInstance().getModManager();
+		String query = this.getSearchBox().getText().trim();
+		
+		orderedMods.clear();
+		
+		for(Mod mod : modManager.getMods()) {
+			
+			if(filterMod(mod)) {
+				continue;
+			}
+			
+			if(!query.isEmpty() && scoreMod(modManager, mod, query) < 0) {
+				continue;
+			}
+			
+			orderedMods.add(mod);
+		}
+		
+		final String sortQuery = query;
+		final ModManager sortManager = modManager;
+		
+		orderedMods.sort((a, b) -> {
+			
+			boolean pinnedA = Favourites.isPinned(a);
+			boolean pinnedB = Favourites.isPinned(b);
+			
+			if(pinnedA != pinnedB) {
+				return pinnedA ? -1 : 1;
+			}
+			
+			if(!sortQuery.isEmpty()) {
+				return Integer.compare(scoreMod(sortManager, b, sortQuery), scoreMod(sortManager, a, sortQuery));
+			}
+			
+			boolean recentA = Recents.contains(a);
+			boolean recentB = Recents.contains(b);
+			
+			if(recentA != recentB) {
+				return recentA ? -1 : 1;
+			}
+			
+			return 0;
+		});
+	}
+	
+	private int scoreMod(ModManager modManager, Mod mod, String query) {
+		
+		int nameScore = SearchUtils.score(mod.getName(), query);
+		
+		if(nameScore >= 0) {
+			return nameScore + 40;
+		}
+		
+		return SearchUtils.score(mod.getDescription() + " " + modManager.getWords(mod), query);
+	}
+	
+	/**
+	 * Shift-click toggles the whole range since the last clicked row.
+	 */
+	private void toggleRow(Mod mod) {
+		
+		boolean shift = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+		
+		if(shift && lastClickedMod != null) {
+			
+			int from = orderedMods.indexOf(lastClickedMod);
+			int to = orderedMods.indexOf(mod);
+			
+			if(from >= 0 && to >= 0) {
+				
+				for(int i = Math.min(from, to); i <= Math.max(from, to); i++) {
+					
+					Mod target = orderedMods.get(i);
+					target.setToggled(!target.isToggled());
+				}
+			}
+		} else {
+			mod.toggle();
+		}
+		
+		Recents.push(mod);
+		lastClickedMod = mod;
+	}
+	
+	private void drawEmptyState(NanoVGManager nvg, ColorPalette palette, float drawY, float scrollValue) {
+		
+		String query = this.getSearchBox().getText().trim();
+		
+		String message = query.isEmpty()
+				? "No modules in this category"
+				: "Nothing matches " + nvg.getLimitText(query, 9, Fonts.MEDIUM, 180);
+		
+		nvg.drawCenteredText(message, this.getX() + (this.getWidth() / 2.0F), drawY + 40, palette.getFontColor(ColorType.NORMAL), 9, Fonts.MEDIUM);
+		
+		if(query.isEmpty()) {
+			return;
+		}
+		
+		float width = 86;
+		float height = 18;
+		float x = this.getX() + ((this.getWidth() - width) / 2.0F);
+		float y = drawY + 58;
+		
+		nvg.drawRoundedRect(x, y, width, height, 6, palette.getBackgroundColor(ColorType.DARK));
+		nvg.drawCenteredText("Clear search", x + (width / 2.0F), y + 5, palette.getFontColor(ColorType.DARK), 8, Fonts.MEDIUM);
+		
+		clearSearchX = x;
+		clearSearchY = y + scrollValue;
+		clearSearchWidth = width;
+		clearSearchHeight = height;
+		emptyStateVisible = true;
+		
+		MorphCursor.getInstance().hover(x, y + scrollValue, width, height, 6, "Clear the search");
+	}
+	
 	private boolean filterMod(Mod m) {
 		
 		if(m.isHide()) {
@@ -577,10 +908,6 @@ public class ModuleCategory extends Category {
 		}
 		
 		if(!currentCategory.equals(ModCategory.ALL) && !m.getCategory().equals(currentCategory)) {
-			return true;
-		}
-		
-		if(!this.getSearchBox().getText().isEmpty() && !SearchUtils.isSimillar(Glide.getInstance().getModManager().getWords(m), this.getSearchBox().getText())) {
 			return true;
 		}
 		

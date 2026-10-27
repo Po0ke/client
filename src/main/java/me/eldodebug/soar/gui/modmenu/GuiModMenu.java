@@ -10,6 +10,7 @@ import eu.shoroa.contrib.render.ShBlur;
 import me.eldodebug.soar.gui.modmenu.category.impl.*;
 import me.eldodebug.soar.management.file.FileManager;
 import me.eldodebug.soar.management.language.TranslateText;
+import me.eldodebug.soar.management.misc.ClickTripler;
 import me.eldodebug.soar.management.mods.impl.InternalSettingsMod;
 import me.eldodebug.soar.management.nanovg.font.FontManager;
 import me.eldodebug.soar.management.nanovg.font.Icons;
@@ -27,6 +28,7 @@ import me.eldodebug.soar.management.event.impl.EventRenderNotification;
 import me.eldodebug.soar.management.nanovg.NanoVGManager;
 import me.eldodebug.soar.management.nanovg.font.Fonts;
 import me.eldodebug.soar.management.nanovg.font.LegacyIcon;
+import me.eldodebug.soar.ui.CommandPalette;
 import me.eldodebug.soar.ui.comp.impl.field.CompSearchBox;
 import me.eldodebug.soar.utils.MathUtils;
 import me.eldodebug.soar.utils.animation.normal.Animation;
@@ -34,6 +36,7 @@ import me.eldodebug.soar.utils.animation.normal.Direction;
 import me.eldodebug.soar.utils.animation.normal.easing.EaseBackIn;
 import me.eldodebug.soar.utils.animation.simple.SimpleAnimation;
 import me.eldodebug.soar.utils.buffer.ScreenAnimation;
+import me.eldodebug.soar.utils.mouse.MorphCursor;
 import me.eldodebug.soar.utils.mouse.MouseUtils;
 import me.eldodebug.soar.utils.mouse.Scroll;
 import me.eldodebug.soar.utils.render.BlurUtils;
@@ -56,7 +59,11 @@ public class GuiModMenu extends GuiScreen {
 	
 	private boolean toEditHUD, canClose;
 	
+	private int categoryTransitionDirection = 1;
+	
 	private CompSearchBox searchBox = new CompSearchBox();
+	
+	private CommandPalette commandPalette = new CommandPalette();
 	
 	public GuiModMenu() {
 		
@@ -94,6 +101,32 @@ public class GuiModMenu extends GuiScreen {
 		scroll.resetAll();
 		toEditHUD = false;
 		canClose = true;
+		
+		commandPalette.close();
+		
+		ArrayList<CommandPalette.Action> paletteActions = new ArrayList<CommandPalette.Action>();
+		
+		paletteActions.add(new CommandPalette.Action("Edit HUD", "Open the HUD editor", this::openHudEditor));
+		paletteActions.add(new CommandPalette.Action("Toggle UI Blur", "Background blur on or off",
+				() -> InternalSettingsMod.getInstance().getBlurSetting().setToggled(!InternalSettingsMod.getInstance().getBlurSetting().isToggled())));
+		
+		if(ClickTripler.isSupported()) {
+			paletteActions.add(new CommandPalette.Action("Toggle Click Tripler", "Third click on fast double clicks",
+					() -> InternalSettingsMod.getInstance().getClickTriplerSetting().setToggled(!InternalSettingsMod.getInstance().getClickTriplerSetting().isToggled())));
+		}
+		
+		commandPalette.setActions(paletteActions);
+		commandPalette.setSettingsListener(mod -> {
+			
+			ModuleCategory moduleCategory = (ModuleCategory) getCategoryByClass(ModuleCategory.class);
+			
+			if(moduleCategory != null) {
+				moduleCategory.openSettings(mod);
+			}
+		});
+		
+		MorphCursor.getInstance().setEnabled(InternalSettingsMod.getInstance().getMorphCursorSetting().isToggled());
+		MorphCursor.getInstance().refreshNativeCursor();
 	}
 	
 	@Override
@@ -101,6 +134,18 @@ public class GuiModMenu extends GuiScreen {
 		
 		Glide instance = Glide.getInstance();
 		NanoVGManager nvg = instance.getNanoVGManager();
+		
+		boolean morphCursorEnabled = InternalSettingsMod.getInstance().getMorphCursorSetting().isToggled();
+		MorphCursor morphCursor = MorphCursor.getInstance();
+		
+		if(morphCursor.isEnabled() != morphCursorEnabled) {
+			morphCursor.setEnabled(morphCursorEnabled);
+		}
+		
+		if(morphCursorEnabled) {
+			morphCursor.beginFrame(mouseX, mouseY);
+			morphCursor.setGlobalAlpha(Math.min(introAnimation.getValueFloat(), 1.0F));
+		}
 		
 		if(InternalSettingsMod.getInstance().getBlurSetting().isToggled()) BlurUtils.drawBlurScreen((float) (Math.min(introAnimation.getValue(), 1) * 20) + 1F);
 		screenAnimation.wrap(() -> {
@@ -112,6 +157,10 @@ public class GuiModMenu extends GuiScreen {
 		new EventRenderNotification().call();
 		
 		super.drawScreen(mouseX, mouseY, partialTicks);
+		
+		if(morphCursorEnabled) {
+			morphCursor.draw();
+		}
 	}
 	
 	private void drawNanoVG(int mouseX, int mouseY, float partialTicks) {
@@ -125,6 +174,11 @@ public class GuiModMenu extends GuiScreen {
 		if(introAnimation.isDone(Direction.BACKWARDS)) {
 			mc.displayGuiScreen(toEditHUD ? new GuiEditHUD(true) : null);
 		}
+		
+		// Keeps the external helper in step even when the toggle is flipped from the palette.
+		ClickTripler.sync(InternalSettingsMod.getInstance().getClickTriplerSetting().isToggled(),
+				InternalSettingsMod.getInstance().getClickTriplerMinDelay().getValueInt(),
+				InternalSettingsMod.getInstance().getClickTriplerMaxDelay().getValueInt());
 		nvg.drawRoundedRect(x, y, width, height, 12, palette.getBackgroundColor(ColorType.NORMAL));
 
 		if (InternalSettingsMod.getInstance().getBlurSetting().isToggled()) {
@@ -160,6 +214,8 @@ public class GuiModMenu extends GuiScreen {
 			
 			nvg.drawText(c.getIcon(), x + 9F, y + 42 + offsetY, textColor, 14, Fonts.LEGACYICON);
 			
+			MorphCursor.getInstance().hover(x + 5.5F, y + 38.5F + offsetY, 21, 21, 6);
+			
 			offsetY+=30;
 		}
 		
@@ -167,6 +223,8 @@ public class GuiModMenu extends GuiScreen {
 		
 		nvg.drawGradientRoundedRect(x + 5.5F, y + height - 30, 21, 21, 6, currentColor.getColor1(), currentColor.getColor2());
 		nvg.drawText(LegacyIcon.LAYOUT, x + 9, y + height - 26.5F, Color.WHITE, 14, Fonts.LEGACYICON);
+		
+		MorphCursor.getInstance().hover(x + 5.5F, y + height - 30, 21, 21, 6);
 		
 		for(Category c : categories) {
 			
@@ -186,6 +244,7 @@ public class GuiModMenu extends GuiScreen {
 				if(c.isShowSearchBox()) {
 					searchBox.setPosition(x + width - 175, y + 6.5F, 160, 18);
 					searchBox.draw(mouseX, mouseY, partialTicks);
+					MorphCursor.getInstance().hover(searchBox.getX(), searchBox.getY(), searchBox.getWidth(), searchBox.getHeight(), 6);
 				}
 				int yOff = (currentCategory.isShowTitle()) ? 31 : 0;
 				if(Objects.equals(currentCategory.getNameKey(), TranslateText.COSMETICS.getKey())){
@@ -193,9 +252,13 @@ public class GuiModMenu extends GuiScreen {
 					float folderButtonY = y + 6.5F;
 					nvg.drawRoundedRect(folderButtonX, folderButtonY, 18,18, 6, palette.getBackgroundColor(ColorType.DARK));
 					nvg.drawCenteredText(LegacyIcon.FOLDER,folderButtonX + 8.5F, folderButtonY + 9 - (nvg.getTextHeight(LegacyIcon.FOLDER, 9, Fonts.LEGACYICON)/2), palette.getFontColor(ColorType.NORMAL), 9, Fonts.LEGACYICON);
+					MorphCursor.getInstance().hover(folderButtonX, folderButtonY, 18, 18, 6);
 				}
 				nvg.scissor(x + 32, y + yOff, width - 32, height - yOff);
-				nvg.translate(0, 50 - (c.getCategoryAnimation().getValue() * 50));
+				
+				// Content enters from the side the user navigated towards, not always downwards.
+				float entranceOffset = 1.0F - c.getCategoryAnimation().getValue();
+				nvg.translate(entranceOffset * 22.0F * categoryTransitionDirection, entranceOffset * 10.0F);
 				
 				c.drawScreen(mouseX, mouseY, partialTicks);
 				
@@ -206,11 +269,15 @@ public class GuiModMenu extends GuiScreen {
 			}
 		}
 		
-		if(MouseUtils.isInside(mouseX, mouseY, x + 32, y + 31, width - 32, height - 31)) {
+		if(!commandPalette.isOpen() && MouseUtils.isInside(mouseX, mouseY, x + 32, y + 31, width - 32, height - 31)) {
 			scroll.onScroll();
 		}
 		
 		scroll.onAnimation();
+		
+		if(commandPalette.isOpen()) {
+			commandPalette.draw(mouseX, mouseY, partialTicks, x, y, width, height);
+		}
 
 		if(currentCategory.isShowSearchBox() && Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) && Keyboard.isKeyDown(Keyboard.KEY_F)) {
 			currentCategory.getSearchBox().setFocused(true);
@@ -219,6 +286,14 @@ public class GuiModMenu extends GuiScreen {
 	
 	@Override
 	public void mouseClicked(int mouseX, int mouseY, int mouseButton) {
+		
+		MorphCursor.getInstance().onMouseDown();
+		
+		if(commandPalette.isOpen()) {
+			commandPalette.mouseClicked(mouseX, mouseY, mouseButton);
+			return;
+		}
+		
 		int offsetY = 0;
 
 		// exit gui if not clicked in the gui area
@@ -229,6 +304,7 @@ public class GuiModMenu extends GuiScreen {
 		for(Category c : categories) {
 			
 			if(MouseUtils.isInside(mouseX, mouseY, x + 5.5F, y + 38.5F + offsetY, 21, 21) && mouseButton == 0) {
+				categoryTransitionDirection = categories.indexOf(c) >= categories.indexOf(currentCategory) ? 1 : -1;
 				currentCategory = c;
 			}
 			
@@ -258,11 +334,28 @@ public class GuiModMenu extends GuiScreen {
 	
 	@Override
 	public void mouseReleased(int mouseX, int mouseY, int mouseButton) {
+		
+		MorphCursor.getInstance().onMouseUp();
+		
+		if(commandPalette.isOpen()) {
+			return;
+		}
+		
 		currentCategory.mouseReleased(mouseX, mouseY, mouseButton);
 	}
 	
 	@Override
 	public void keyTyped(char typedChar, int keyCode) {
+		
+		if(commandPalette.isOpen()) {
+			commandPalette.keyTyped(typedChar, keyCode);
+			return;
+		}
+		
+		if(keyCode == Keyboard.KEY_K && (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL))) {
+			commandPalette.open(x, y, width, height);
+			return;
+		}
 		
 		currentCategory.keyTyped(typedChar, keyCode);
 		searchBox.keyTyped(typedChar, keyCode);
@@ -296,9 +389,17 @@ public class GuiModMenu extends GuiScreen {
 	
 	@Override
 	public void onGuiClosed() {
+		commandPalette.close();
+		MorphCursor.getInstance().onScreenClosed();
 		Glide.getInstance().getProfileManager().save();
 	}
 
+	public void openHudEditor() {
+		toEditHUD = true;
+		canClose = false;
+		introAnimation.setDirection(Direction.BACKWARDS);
+	}
+	
 	public int getX() {
 		return x;
 	}

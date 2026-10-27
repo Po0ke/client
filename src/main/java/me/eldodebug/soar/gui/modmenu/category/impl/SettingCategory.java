@@ -3,6 +3,7 @@ package me.eldodebug.soar.gui.modmenu.category.impl;
 import java.awt.*;
 import java.util.ArrayList;
 
+import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.ClickTriplerScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.GeneralScene;
 import org.lwjgl.input.Keyboard;
 
@@ -13,6 +14,7 @@ import me.eldodebug.soar.gui.modmenu.category.impl.setting.SettingScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.AppearanceScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.LanguageScene;
 import me.eldodebug.soar.management.color.palette.ColorPalette;
+import me.eldodebug.soar.management.misc.ClickTripler;
 import me.eldodebug.soar.management.color.palette.ColorType;
 import me.eldodebug.soar.management.language.TranslateText;
 import me.eldodebug.soar.management.nanovg.NanoVGManager;
@@ -21,6 +23,7 @@ import me.eldodebug.soar.management.nanovg.font.LegacyIcon;
 import me.eldodebug.soar.utils.animation.normal.Animation;
 import me.eldodebug.soar.utils.animation.normal.Direction;
 import me.eldodebug.soar.utils.animation.normal.other.SmoothStepAnimation;
+import me.eldodebug.soar.utils.mouse.MorphCursor;
 import me.eldodebug.soar.utils.mouse.MouseUtils;
 
 public class SettingCategory extends Category {
@@ -36,6 +39,11 @@ public class SettingCategory extends Category {
 		scenes.add(new AppearanceScene(this));
 		scenes.add(new LanguageScene(this));
 		scenes.add(new GeneralScene(this));
+		
+		// The helper only exists on Linux; there is no point offering a dead switch elsewhere.
+		if(ClickTripler.isSupported()) {
+			scenes.add(new ClickTriplerScene(this));
+		}
 	}
 	
 	@Override
@@ -80,6 +88,10 @@ public class SettingCategory extends Category {
 			nvg.drawText(scene.getName(), this.getX() + 47, this.getY() + offsetY + 9F, palette.getFontColor(ColorType.DARK), 12.5F, Fonts.MEDIUM);
 			nvg.drawText(scene.getDescription(), this.getX() + 47, this.getY() + offsetY + 23, palette.getFontColor(ColorType.NORMAL), 7.5F, Fonts.REGULAR);
 			nvg.drawText(LegacyIcon.CHEVRON_RIGHT, this.getX() + this.getWidth() - 32, this.getY() + offsetY + 15, palette.getFontColor(ColorType.NORMAL), 10, Fonts.LEGACYICON);
+			
+			if(currentScene == null) {
+				MorphCursor.getInstance().hover(this.getX() + 15, this.getY() + offsetY, this.getWidth() - 30, 40, 8);
+			}
 			
 			offsetY+=50;
 		}
