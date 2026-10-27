@@ -29,6 +29,7 @@ import me.eldodebug.soar.management.nanovg.NanoVGManager;
 import me.eldodebug.soar.management.nanovg.font.Fonts;
 import me.eldodebug.soar.management.nanovg.font.LegacyIcon;
 import me.eldodebug.soar.ui.CommandPalette;
+import me.eldodebug.soar.ui.NotificationCenter;
 import me.eldodebug.soar.ui.ambient.AmbientBackdrop;
 import me.eldodebug.soar.ui.comp.impl.field.CompSearchBox;
 import me.eldodebug.soar.utils.MathUtils;
@@ -67,6 +68,8 @@ public class GuiModMenu extends GuiScreen {
 	private final AmbientBackdrop ambient = new AmbientBackdrop();
 	
 	private CommandPalette commandPalette = new CommandPalette();
+	
+	private NotificationCenter notificationCenter = new NotificationCenter();
 	
 	public GuiModMenu() {
 		
@@ -108,10 +111,13 @@ public class GuiModMenu extends GuiScreen {
 		canClose = true;
 		
 		commandPalette.close();
+		notificationCenter.close();
 		
 		ArrayList<CommandPalette.Action> paletteActions = new ArrayList<CommandPalette.Action>();
 		
 		paletteActions.add(new CommandPalette.Action("Edit HUD", "Open the HUD editor", this::openHudEditor));
+		paletteActions.add(new CommandPalette.Action("Notification History", "Open the notification centre",
+				() -> notificationCenter.open(x, y, width, height)));
 		paletteActions.add(new CommandPalette.Action("Toggle UI Blur", "Background blur on or off",
 				() -> InternalSettingsMod.getInstance().getBlurSetting().setToggled(!InternalSettingsMod.getInstance().getBlurSetting().isToggled())));
 		
@@ -259,12 +265,32 @@ public class GuiModMenu extends GuiScreen {
 					MorphCursor.getInstance().hover(searchBox.getX(), searchBox.getY(), searchBox.getWidth(), searchBox.getHeight(), 6);
 				}
 				int yOff = (currentCategory.isShowTitle()) ? 31 : 0;
+				
+				float bellX = x + width - 199;
+				float bellY = y + 6.5F;
+				int unread = instance.getNotificationManager().getUnread();
+				boolean bellHovered = MouseUtils.isInside(mouseX, mouseY, bellX, bellY, 18, 18);
+				
+				nvg.drawRoundedRect(bellX, bellY, 18, 18, 6,
+						bellHovered ? palette.getBackgroundColor(ColorType.NORMAL) : palette.getBackgroundColor(ColorType.DARK));
+				nvg.drawCenteredText(LegacyIcon.BELL, bellX + 9.0F, bellY + 5.0F,
+						unread > 0 ? currentColor.getInterpolateColor() : palette.getFontColor(ColorType.NORMAL), 10, Fonts.LEGACYICON);
+				
+				if(unread > 0) {
+					float badge = 8.0F;
+					nvg.drawGradientRoundedRect(bellX + 12, bellY - 2, badge, badge, badge / 2.0F, currentColor.getColor1(), currentColor.getColor2());
+					nvg.drawCenteredText(unread > 9 ? "9" : String.valueOf(unread), bellX + 12 + (badge / 2.0F), bellY,
+							Color.WHITE, 6, Fonts.MEDIUM);
+				}
+				
+				MorphCursor.getInstance().hover(bellX, bellY, 18, 18, 6, "Notifications (Ctrl+N)");
+				
 				if(Objects.equals(currentCategory.getNameKey(), TranslateText.COSMETICS.getKey())){
-					float folderButtonX = x + width - 198;
+					float folderButtonX = x + width - 221;
 					float folderButtonY = y + 6.5F;
 					nvg.drawRoundedRect(folderButtonX, folderButtonY, 18,18, 6, palette.getBackgroundColor(ColorType.DARK));
 					nvg.drawCenteredText(LegacyIcon.FOLDER,folderButtonX + 8.5F, folderButtonY + 9 - (nvg.getTextHeight(LegacyIcon.FOLDER, 9, Fonts.LEGACYICON)/2), palette.getFontColor(ColorType.NORMAL), 9, Fonts.LEGACYICON);
-					MorphCursor.getInstance().hover(folderButtonX, folderButtonY, 18, 18, 6);
+					MorphCursor.getInstance().hover(folderButtonX, folderButtonY, 18, 18, 6, "Open cape folder");
 				}
 				nvg.scissor(x + 32, y + yOff, width - 32, height - yOff);
 				
@@ -281,7 +307,7 @@ public class GuiModMenu extends GuiScreen {
 			}
 		}
 		
-		if(!commandPalette.isOpen() && MouseUtils.isInside(mouseX, mouseY, x + 32, y + 31, width - 32, height - 31)) {
+		if(!commandPalette.isOpen() && !notificationCenter.isOpen() && MouseUtils.isInside(mouseX, mouseY, x + 32, y + 31, width - 32, height - 31)) {
 			scroll.onScroll();
 		}
 		
@@ -289,6 +315,10 @@ public class GuiModMenu extends GuiScreen {
 		
 		if(commandPalette.isOpen()) {
 			commandPalette.draw(mouseX, mouseY, partialTicks, x, y, width, height);
+		}
+		
+		if(notificationCenter.isOpen()) {
+			notificationCenter.draw(mouseX, mouseY, partialTicks, x, y, width, height);
 		}
 
 		if(currentCategory.isShowSearchBox() && Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) && Keyboard.isKeyDown(Keyboard.KEY_F)) {
@@ -303,6 +333,11 @@ public class GuiModMenu extends GuiScreen {
 		
 		if(commandPalette.isOpen()) {
 			commandPalette.mouseClicked(mouseX, mouseY, mouseButton);
+			return;
+		}
+		
+		if(notificationCenter.isOpen()) {
+			notificationCenter.mouseClicked(mouseX, mouseY, mouseButton);
 			return;
 		}
 		
@@ -328,11 +363,17 @@ public class GuiModMenu extends GuiScreen {
 			beginClose();
 		}
 		
+		if(MouseUtils.isInside(mouseX, mouseY, x + width - 199, y + 6.5F, 18, 18) && mouseButton == 0) {
+			commandPalette.close();
+			notificationCenter.open(x, y, width, height);
+			return;
+		}
+		
 		currentCategory.mouseClicked(mouseX, mouseY, mouseButton);
 		searchBox.mouseClicked(mouseX, mouseY, mouseButton);
 
 		if(Objects.equals(currentCategory.getNameKey(), TranslateText.COSMETICS.getKey())){
-			float folderButtonX = x + width - 198;
+			float folderButtonX = x + width - 221;
 			float folderButtonY = y + 6.5F;
 			if (MouseUtils.isInside(mouseX, mouseY, folderButtonX, folderButtonY, 18, 18)){
 				FileUtils.openFolderAtPath(Glide.getInstance().getFileManager().getCustomCapeDir());
@@ -364,7 +405,19 @@ public class GuiModMenu extends GuiScreen {
 			return;
 		}
 		
+		if(notificationCenter.isOpen()) {
+			notificationCenter.keyTyped(typedChar, keyCode);
+			return;
+		}
+		
+		if(keyCode == Keyboard.KEY_N && (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL))) {
+			commandPalette.close();
+			notificationCenter.open(x, y, width, height);
+			return;
+		}
+		
 		if(keyCode == Keyboard.KEY_K && (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL))) {
+			notificationCenter.close();
 			commandPalette.open(x, y, width, height);
 			return;
 		}
@@ -402,6 +455,7 @@ public class GuiModMenu extends GuiScreen {
 	@Override
 	public void onGuiClosed() {
 		commandPalette.close();
+		notificationCenter.close();
 		MorphCursor.getInstance().onScreenClosed();
 		Glide.getInstance().getProfileManager().save();
 	}
