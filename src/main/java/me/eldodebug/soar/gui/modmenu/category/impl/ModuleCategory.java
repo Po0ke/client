@@ -84,7 +84,7 @@ public class ModuleCategory extends Category {
 	private static final float CTX_WIDTH = 124;
 	private static final float CTX_ITEM = 20;
 	private static final float CTX_PAD = 4;
-	private static final int CTX_ITEMS = 4;
+	private static final int CTX_ITEMS = 5;
 	private static final float CTX_HEIGHT = (CTX_PAD * 2) + (CTX_ITEM * CTX_ITEMS);
 	
 	public ModuleCategory(GuiModMenu parent) {
@@ -978,7 +978,8 @@ public class ModuleCategory extends Category {
 				contextMod.isToggled() ? "Disable" : "Enable",
 				"Settings",
 				Favourites.isPinned(contextMod) ? "Unpin" : "Pin",
-				"Reset settings"
+				"Reset settings",
+				"Copy name"
 		};
 		
 		for(int i = 0; i < CTX_ITEMS; i++) {
@@ -1027,6 +1028,9 @@ public class ModuleCategory extends Category {
 					setting.reset();
 				}
 			}
+			break;
+		case 4:
+			net.minecraft.client.gui.GuiScreen.setClipboardString(target.getName());
 			break;
 		}
 		

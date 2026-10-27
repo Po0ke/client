@@ -32,7 +32,7 @@ public class AdvancedScene extends SettingScene {
 	private static final float BUTTON_HEIGHT = 18.0F;
 	private static final long CONFIRM_WINDOW_MS = 4000L;
 
-	private boolean confirmReset;
+	private int confirmAction = -1;
 	private long confirmAt;
 
 	public AdvancedScene(SettingCategory parent) {
@@ -41,7 +41,7 @@ public class AdvancedScene extends SettingScene {
 
 	@Override
 	public void initGui() {
-		confirmReset = false;
+		confirmAction = -1;
 	}
 
 	@Override
@@ -51,22 +51,26 @@ public class AdvancedScene extends SettingScene {
 		NanoVGManager nvg = instance.getNanoVGManager();
 		ColorPalette palette = instance.getColorManager().getPalette();
 
-		if(confirmReset && System.currentTimeMillis() - confirmAt > CONFIRM_WINDOW_MS) {
-			confirmReset = false;
+		if(confirmAction >= 0 && System.currentTimeMillis() - confirmAt > CONFIRM_WINDOW_MS) {
+			confirmAction = -1;
 		}
 
 		drawRow(nvg, palette, mouseX, mouseY, 0, "Reset all module settings",
-				"Restore every module and setting to its default", confirmReset ? "Confirm" : "Reset", confirmReset, true);
-		drawRow(nvg, palette, mouseX, mouseY, 1, "Clear pinned modules",
-				"Remove every module from the pinned section", "Clear", false, false);
-		drawRow(nvg, palette, mouseX, mouseY, 2, "Clear recent modules",
-				"Forget the modules used this session", "Clear", false, false);
-		drawRow(nvg, palette, mouseX, mouseY, 3, "Clear notifications",
-				"Empty the notification history", "Clear", false, false);
+				"Restore every module and setting to its default",
+				confirmAction == 0 ? "Confirm" : "Reset", true);
+		drawRow(nvg, palette, mouseX, mouseY, 1, "Disable all modules",
+				"Turn every module off without touching its settings",
+				confirmAction == 1 ? "Confirm" : "Disable", true);
+		drawRow(nvg, palette, mouseX, mouseY, 2, "Clear pinned modules",
+				"Remove every module from the pinned section", "Clear", false);
+		drawRow(nvg, palette, mouseX, mouseY, 3, "Clear recent modules",
+				"Forget the modules used this session", "Clear", false);
+		drawRow(nvg, palette, mouseX, mouseY, 4, "Clear notifications",
+				"Empty the notification history", "Clear", false);
 	}
 
 	private void drawRow(NanoVGManager nvg, ColorPalette palette, int mouseX, int mouseY, int index,
-			String title, String description, String buttonLabel, boolean danger, boolean active) {
+			String title, String description, String buttonLabel, boolean danger) {
 
 		float rowY = this.getY() + (index * ROW_STEP);
 		float buttonX = this.getX() + this.getWidth() - BUTTON_WIDTH - 8;
@@ -79,16 +83,14 @@ public class AdvancedScene extends SettingScene {
 		boolean hovered = MouseUtils.isInside(mouseX, mouseY, buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT);
 
 		Color fill = danger ? new Color(220, 70, 70, hovered ? 220 : 180)
-				: (hovered ? palette.getBackgroundColor(ColorType.NORMAL) : palette.getBackgroundColor(ColorType.NORMAL));
+				: palette.getBackgroundColor(ColorType.NORMAL);
 
 		nvg.drawRoundedRect(buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, 5, fill);
 		nvg.drawCenteredText(buttonLabel, buttonX + (BUTTON_WIDTH / 2.0F), buttonY + 5.0F,
 				danger ? Color.WHITE : palette.getFontColor(ColorType.DARK), 8, Fonts.MEDIUM);
 
-		if(active) {
-			MorphCursor.getInstance().hover(buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, 5,
-					confirmReset ? "Click again to confirm" : "Reset all module settings");
-		}
+		MorphCursor.getInstance().hover(buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, 5,
+				confirmAction == index ? "Click again to confirm" : title);
 	}
 
 	@Override
@@ -98,7 +100,7 @@ public class AdvancedScene extends SettingScene {
 			return;
 		}
 
-		for(int i = 0; i < 4; i++) {
+		for(int i = 0; i < 5; i++) {
 
 			float rowY = this.getY() + (i * ROW_STEP);
 			float buttonX = this.getX() + this.getWidth() - BUTTON_WIDTH - 8;
@@ -108,15 +110,15 @@ public class AdvancedScene extends SettingScene {
 				continue;
 			}
 
-			if(i == 0) {
-				handleReset();
-			} else if(i == 1) {
+			if(i <= 1) {
+				handleConfirm(i);
+			} else if(i == 2) {
 				Favourites.clear();
 				Glide.getInstance().getNotificationManager().post("Pinned modules", "Cleared", NotificationType.SUCCESS);
-			} else if(i == 2) {
+			} else if(i == 3) {
 				Recents.clear();
 				Glide.getInstance().getNotificationManager().post("Recent modules", "Cleared", NotificationType.SUCCESS);
-			} else if(i == 3) {
+			} else if(i == 4) {
 				Glide.getInstance().getNotificationManager().clearHistory();
 			}
 
@@ -124,19 +126,29 @@ public class AdvancedScene extends SettingScene {
 		}
 	}
 
-	private void handleReset() {
+	private void handleConfirm(int action) {
 
 		long now = System.currentTimeMillis();
 
-		if(!confirmReset || now - confirmAt > CONFIRM_WINDOW_MS) {
-			confirmReset = true;
+		if(confirmAction != action || now - confirmAt > CONFIRM_WINDOW_MS) {
+			confirmAction = action;
 			confirmAt = now;
-			Glide.getInstance().getNotificationManager().post("Reset all settings",
+			Glide.getInstance().getNotificationManager().post(
+					action == 0 ? "Reset all settings" : "Disable all modules",
 					"Click Confirm within 4 seconds", NotificationType.WARNING);
 			return;
 		}
 
-		confirmReset = false;
+		confirmAction = -1;
+
+		if(action == 0) {
+			resetAllSettings();
+		} else {
+			disableAllModules();
+		}
+	}
+
+	private void resetAllSettings() {
 
 		ArrayList<Mod> mods = Glide.getInstance().getModManager().getMods();
 		int reset = 0;
@@ -162,5 +174,24 @@ public class AdvancedScene extends SettingScene {
 
 		Glide.getInstance().getNotificationManager().post("Module settings",
 				"Reset " + reset + " modules to defaults", NotificationType.SUCCESS);
+	}
+
+	private void disableAllModules() {
+
+		ArrayList<Mod> mods = Glide.getInstance().getModManager().getMods();
+		int disabled = 0;
+
+		for(Mod mod : mods) {
+
+			if(mod instanceof InternalSettingsMod || !mod.isToggled()) {
+				continue;
+			}
+
+			mod.setToggled(false);
+			disabled++;
+		}
+
+		Glide.getInstance().getNotificationManager().post("Modules",
+				"Disabled " + disabled + " modules", NotificationType.SUCCESS);
 	}
 }
