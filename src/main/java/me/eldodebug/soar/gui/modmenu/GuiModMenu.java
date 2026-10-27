@@ -226,7 +226,7 @@ public class GuiModMenu extends GuiScreen {
 			
 			nvg.drawText(c.getIcon(), x + 9F, y + 42 + offsetY, textColor, 14, Fonts.LEGACYICON);
 			
-			MorphCursor.getInstance().hover(x + 5.5F, y + 38.5F + offsetY, 21, 21, 6);
+			MorphCursor.getInstance().hover(x + 5.5F, y + 38.5F + offsetY, 21, 21, 6, c.getName());
 			
 			offsetY+=30;
 		}
@@ -236,7 +236,7 @@ public class GuiModMenu extends GuiScreen {
 		nvg.drawGradientRoundedRect(x + 5.5F, y + height - 30, 21, 21, 6, currentColor.getColor1(), currentColor.getColor2());
 		nvg.drawText(LegacyIcon.LAYOUT, x + 9, y + height - 26.5F, Color.WHITE, 14, Fonts.LEGACYICON);
 		
-		MorphCursor.getInstance().hover(x + 5.5F, y + height - 30, 21, 21, 6);
+		MorphCursor.getInstance().hover(x + 5.5F, y + height - 30, 21, 21, 6, "Edit HUD");
 		
 		for(Category c : categories) {
 			

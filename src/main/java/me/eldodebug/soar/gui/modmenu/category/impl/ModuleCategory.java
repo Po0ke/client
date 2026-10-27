@@ -75,6 +75,14 @@ public class ModuleCategory extends Category {
 	private boolean emptyStateVisible;
 	private float clearSearchX, clearSearchY, clearSearchWidth, clearSearchHeight;
 	
+	private Mod contextMod;
+	private float contextX, contextY;
+	private static final float CTX_WIDTH = 124;
+	private static final float CTX_ITEM = 20;
+	private static final float CTX_PAD = 4;
+	private static final int CTX_ITEMS = 4;
+	private static final float CTX_HEIGHT = (CTX_PAD * 2) + (CTX_ITEM * CTX_ITEMS);
+	
 	public ModuleCategory(GuiModMenu parent) {
 		super(parent, TranslateText.MODULE, LegacyIcon.ARCHIVE, true, true);
 	}
@@ -97,6 +105,7 @@ public class ModuleCategory extends Category {
 		categoryOpenedAt = System.currentTimeMillis();
 		lastClickedMod = null;
 		pressedMod = null;
+		contextMod = null;
 	}
 	
 	@Override
@@ -228,6 +237,10 @@ public class ModuleCategory extends Category {
 				nvg.drawGradientRoundedRect(this.getX() + 21, this.getY() + offsetY + 6, 28, 28, 6, ColorUtils.applyAlpha(accentColor.getColor1(), (int) (m.getAnimation().getValue() * 255)), ColorUtils.applyAlpha(accentColor.getColor2(), (int) (m.getAnimation().getValue() * 255)));
 				
 				nvg.restore();
+				
+				// A category glyph turns the flat toggle square into something scannable.
+				nvg.drawCenteredText(getCategoryIcon(m.getCategory()), this.getX() + 35,
+						this.getY() + offsetY + 13.5F, m.isToggled() ? Color.WHITE : palette.getFontColor(ColorType.NORMAL), 13, Fonts.LEGACYICON);
 				
 				if(modManager.getSettingsByMod(m) != null) {
 					nvg.drawText(LegacyIcon.SETTINGS, right - 39, this.getY() + offsetY + 13.5F, palette.getFontColor(ColorType.NORMAL), 13, Fonts.LEGACYICON);
@@ -404,6 +417,8 @@ public class ModuleCategory extends Category {
 		
 		nvg.restore();
 		
+		drawContextMenu(nvg, palette, accentColor, mouseX, mouseY);
+		
 		int visibleCount = orderedMods.size();
 		scroll.setMaxScroll((visibleCount - (visibleCount > 5 ? 5.18F : visibleCount)) * 50);
 	}
@@ -414,6 +429,25 @@ public class ModuleCategory extends Category {
 		Glide instance = Glide.getInstance();
 		NanoVGManager nvg = instance.getNanoVGManager();
 		ModManager modManager = instance.getModManager();
+		
+		if(contextMod != null) {
+			
+			float menuX = contextMenuX();
+			float menuY = contextMenuY();
+			
+			if(MouseUtils.isInside(mouseX, mouseY, menuX, menuY, CTX_WIDTH, CTX_HEIGHT)) {
+				
+				int item = (int) ((mouseY - (menuY + CTX_PAD)) / CTX_ITEM);
+				
+				if(item >= 0 && item < CTX_ITEMS) {
+					handleContextAction(item);
+				}
+			} else {
+				contextMod = null;
+			}
+			
+			return;
+		}
 		
 		int offsetX = 0;
 		float offsetY = 13 + scroll.getValue();
@@ -443,6 +477,13 @@ public class ModuleCategory extends Category {
 			}
 			
 			for(Mod m : orderedMods) {
+				
+				if(mouseButton == 1 && MouseUtils.isInside(mouseX, mouseY, this.getX() + 15, this.getY() + offsetY, this.getWidth() - 30, 40)) {
+					contextMod = m;
+					contextX = mouseX;
+					contextY = mouseY;
+					return;
+				}
 				
 				if(MouseUtils.isInside(mouseX, mouseY, this.getX(), this.getY(), this.getWidth(), this.getHeight()) && mouseButton == 0) {
 					
@@ -779,6 +820,103 @@ public class ModuleCategory extends Category {
 	
 	private float clamp01(float value) {
 		return Math.max(0.0F, Math.min(1.0F, value));
+	}
+	
+	private String getCategoryIcon(ModCategory category) {
+		
+		switch(category) {
+		case PLAYER:
+			return LegacyIcon.USER;
+		case RENDER:
+			return LegacyIcon.IMAGE;
+		case HUD:
+			return LegacyIcon.LAYOUT;
+		case WORLD:
+			return LegacyIcon.GLOBE;
+		case OTHER:
+			return LegacyIcon.MORE_HORIZONTAL;
+		default:
+			return LegacyIcon.GRID;
+		}
+	}
+	
+	private float contextMenuX() {
+		return Math.max(this.getX() + 8, Math.min(contextX, this.getX() + this.getWidth() - CTX_WIDTH - 8));
+	}
+	
+	private float contextMenuY() {
+		return Math.max(this.getY() + 8, Math.min(contextY, this.getY() + this.getHeight() - CTX_HEIGHT - 8));
+	}
+	
+	private void drawContextMenu(NanoVGManager nvg, ColorPalette palette, AccentColor accentColor, int mouseX, int mouseY) {
+		
+		if(contextMod == null) {
+			return;
+		}
+		
+		float menuX = contextMenuX();
+		float menuY = contextMenuY();
+		
+		nvg.drawSoftShadow(menuX, menuY, CTX_WIDTH, CTX_HEIGHT, 8, 150);
+		nvg.drawRoundedRect(menuX, menuY, CTX_WIDTH, CTX_HEIGHT, 8, palette.getBackgroundColor(ColorType.DARK));
+		
+		String[] labels = new String[] {
+				contextMod.isToggled() ? "Disable" : "Enable",
+				"Settings",
+				Favourites.isPinned(contextMod) ? "Unpin" : "Pin",
+				"Reset settings"
+		};
+		
+		for(int i = 0; i < CTX_ITEMS; i++) {
+			
+			float itemY = menuY + CTX_PAD + (i * CTX_ITEM);
+			boolean hovered = MouseUtils.isInside(mouseX, mouseY, menuX + 3, itemY, CTX_WIDTH - 6, CTX_ITEM);
+			
+			if(hovered) {
+				nvg.drawRoundedRect(menuX + 3, itemY, CTX_WIDTH - 6, CTX_ITEM, 5,
+						ColorUtils.applyAlpha(accentColor.getColor1(), 60));
+			}
+			
+			boolean enabled = i != 1 || Glide.getInstance().getModManager().getSettingsByMod(contextMod) != null;
+			Color textColor = !enabled ? ColorUtils.applyAlpha(palette.getFontColor(ColorType.NORMAL), 110)
+					: (hovered ? Color.WHITE : palette.getFontColor(ColorType.DARK));
+			
+			nvg.drawText(labels[i], menuX + 12, itemY + 6, textColor, 8.5F, Fonts.MEDIUM);
+			MorphCursor.getInstance().hover(menuX + 3, itemY, CTX_WIDTH - 6, CTX_ITEM, 5);
+		}
+	}
+	
+	private void handleContextAction(int item) {
+		
+		if(contextMod == null) {
+			return;
+		}
+		
+		Mod target = contextMod;
+		
+		switch(item) {
+		case 0:
+			target.toggle();
+			Recents.push(target);
+			break;
+		case 1:
+			contextMod = null;
+			openSettings(target);
+			return;
+		case 2:
+			Favourites.toggle(target);
+			break;
+		case 3:
+			ArrayList<Setting> settings = Glide.getInstance().getModManager().getSettingsByMod(target);
+			if(settings != null) {
+				for(Setting setting : settings) {
+					setting.reset();
+				}
+			}
+			break;
+		}
+		
+		contextMod = null;
 	}
 	
 	/**
