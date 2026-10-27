@@ -31,10 +31,8 @@ import me.eldodebug.soar.management.nanovg.font.LegacyIcon;
 import me.eldodebug.soar.ui.CommandPalette;
 import me.eldodebug.soar.ui.comp.impl.field.CompSearchBox;
 import me.eldodebug.soar.utils.MathUtils;
-import me.eldodebug.soar.utils.animation.normal.Animation;
-import me.eldodebug.soar.utils.animation.normal.Direction;
-import me.eldodebug.soar.utils.animation.normal.easing.EaseBackIn;
 import me.eldodebug.soar.utils.animation.simple.SimpleAnimation;
+import me.eldodebug.soar.utils.animation.spring.Spring;
 import me.eldodebug.soar.utils.buffer.ScreenAnimation;
 import me.eldodebug.soar.utils.mouse.MorphCursor;
 import me.eldodebug.soar.utils.mouse.MouseUtils;
@@ -45,7 +43,9 @@ import net.minecraft.client.gui.ScaledResolution;
 
 public class GuiModMenu extends GuiScreen {
 
-	private Animation introAnimation;
+	private final Spring introSpring = new Spring(0.0D, 24.0D, 1.0D);
+	private boolean closing;
+	private long introLastFrameNanos;
 	private int x, y, width, height;
 	
 	private ArrayList<Category> categories = new ArrayList<Category>();
@@ -91,8 +91,9 @@ public class GuiModMenu extends GuiScreen {
 		width = addX * 2;
 		height = addY * 2;
 		
-		introAnimation = new EaseBackIn(320, 1.0F, 2.0F);
-		introAnimation.setDirection(Direction.FORWARDS);
+		introSpring.setValue(0.0D);
+		closing = false;
+		introLastFrameNanos = 0L;
 		
 		for(Category c : categories) {
 			c.initGui();
@@ -138,21 +139,27 @@ public class GuiModMenu extends GuiScreen {
 		boolean morphCursorEnabled = InternalSettingsMod.getInstance().getMorphCursorSetting().isToggled();
 		MorphCursor morphCursor = MorphCursor.getInstance();
 		
+		long introNow = System.nanoTime();
+		float introDelta = introLastFrameNanos == 0L ? 0.0F : (introNow - introLastFrameNanos) / 1_000_000_000F;
+		introLastFrameNanos = introNow;
+		introSpring.update(closing ? 0.0D : 1.0D, introDelta);
+		float intro = Math.max(0.0F, Math.min(introSpring.get(), 1.0F));
+		
 		if(morphCursor.isEnabled() != morphCursorEnabled) {
 			morphCursor.setEnabled(morphCursorEnabled);
 		}
 		
 		if(morphCursorEnabled) {
 			morphCursor.beginFrame(mouseX, mouseY);
-			morphCursor.setGlobalAlpha(Math.min(introAnimation.getValueFloat(), 1.0F));
+			morphCursor.setGlobalAlpha(intro);
 		}
 		
-		if(InternalSettingsMod.getInstance().getBlurSetting().isToggled()) BlurUtils.drawBlurScreen((float) (Math.min(introAnimation.getValue(), 1) * 20) + 1F);
+		if(InternalSettingsMod.getInstance().getBlurSetting().isToggled()) BlurUtils.drawBlurScreen(intro * 20 + 1F);
 		screenAnimation.wrap(() -> {
 			nvg.drawShadow(x, y, width, height, 12);
-		}, 2 - introAnimation.getValueFloat(), Math.min(introAnimation.getValueFloat(), 1));
+		}, 0.94F + 0.06F * intro, intro);
 		
-		screenAnimation.wrap(() -> drawNanoVG(mouseX, mouseY, partialTicks), this.getX(), this.getY(), this.getWidth(), this.getHeight(), 2 - introAnimation.getValueFloat(), Math.min(introAnimation.getValueFloat(), 1), true);
+		screenAnimation.wrap(() -> drawNanoVG(mouseX, mouseY, partialTicks), this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0.94F + 0.06F * intro, intro, true);
 		
 		new EventRenderNotification().call();
 		
@@ -171,7 +178,7 @@ public class GuiModMenu extends GuiScreen {
 		ColorPalette palette = colorManager.getPalette();
 		AccentColor currentColor = colorManager.getCurrentColor();
 
-		if(introAnimation.isDone(Direction.BACKWARDS)) {
+		if(closing && introSpring.get() <= 0.005F) {
 			mc.displayGuiScreen(toEditHUD ? new GuiEditHUD(true) : null);
 		}
 		
@@ -298,7 +305,7 @@ public class GuiModMenu extends GuiScreen {
 
 		// exit gui if not clicked in the gui area
 		if(!MouseUtils.isInside(mouseX, mouseY, x - 5, y - 5, width + 10, height + 10) && mouseButton == 0 && canClose) {
-			introAnimation.setDirection(Direction.BACKWARDS);
+			beginClose();
 		}
 
 		for(Category c : categories) {
@@ -313,7 +320,7 @@ public class GuiModMenu extends GuiScreen {
 		
 		if(MouseUtils.isInside(mouseX, mouseY, x + 5.5F, y + height - 30, 21, 21) && mouseButton == 0) {
 			toEditHUD = true;
-			introAnimation.setDirection(Direction.BACKWARDS);
+			beginClose();
 		}
 		
 		currentCategory.mouseClicked(mouseX, mouseY, mouseButton);
@@ -378,7 +385,7 @@ public class GuiModMenu extends GuiScreen {
 		}
 		
 		if(keyCode == Keyboard.KEY_ESCAPE && canClose) {
-			introAnimation.setDirection(Direction.BACKWARDS);
+			beginClose();
 		}
 	}
 	
@@ -397,7 +404,11 @@ public class GuiModMenu extends GuiScreen {
 	public void openHudEditor() {
 		toEditHUD = true;
 		canClose = false;
-		introAnimation.setDirection(Direction.BACKWARDS);
+		beginClose();
+	}
+	
+	private void beginClose() {
+		closing = true;
 	}
 	
 	public int getX() {
