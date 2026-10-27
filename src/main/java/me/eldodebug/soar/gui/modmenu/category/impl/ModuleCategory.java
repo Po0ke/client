@@ -202,6 +202,11 @@ public class ModuleCategory extends Category {
 				float descriptionX = this.getX() + 56 + (nvg.getTextWidth(m.getName(), 13, Fonts.MEDIUM)) + 5;
 				float descriptionWidth = (right - 104) - descriptionX;
 				
+				// The inline description gets truncated to fit; the row tooltip reveals the full text.
+				String fullDescription = (m.getDescription() == null || m.getDescription().isEmpty()) ? null : m.getDescription();
+				boolean descriptionCut = fullDescription != null
+						&& (descriptionWidth <= 24 || nvg.getTextWidth(fullDescription, 9, Fonts.REGULAR) > descriptionWidth);
+				
 				if(descriptionWidth > 24) {
 					nvg.drawText(nvg.getLimitText(m.getDescription(), 9, Fonts.REGULAR, descriptionWidth), descriptionX, this.getY() + offsetY + 17, palette.getFontColor(ColorType.NORMAL), 9, Fonts.REGULAR);
 				}
@@ -230,7 +235,7 @@ public class ModuleCategory extends Category {
 				
 				nvg.restore();
 				
-				MorphCursor.getInstance().hover(rowX, this.getY() + offsetY + scrollValue, rowWidth, 40, 8);
+				MorphCursor.getInstance().hover(rowX, this.getY() + offsetY + scrollValue, rowWidth, 40, 8, descriptionCut ? fullDescription : null);
 				MorphCursor.getInstance().hover(right - 70, this.getY() + offsetY + 11 + scrollValue, 18, 18, 4, pinned ? "Unpin module" : "Pin module");
 				
 				if(modManager.getSettingsByMod(m) != null) {

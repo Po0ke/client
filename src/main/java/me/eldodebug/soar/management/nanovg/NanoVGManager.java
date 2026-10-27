@@ -21,6 +21,8 @@ package me.eldodebug.soar.management.nanovg;
 import java.awt.Color;
 import java.io.File;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.lwjgl.nanovg.NVGColor;
 import org.lwjgl.nanovg.NVGPaint;
@@ -45,9 +47,23 @@ public class NanoVGManager {
 	private HashMap<Integer, NVGColor> colorCache = new HashMap<Integer, NVGColor>();
 	
 	// Text measuring is the most called out of all NanoVG operations in the interface
-	// (every row, label and button measures the same strings every frame).
-	private HashMap<String, Float> textWidthCache = new HashMap<String, Float>();
-	private static final int TEXT_WIDTH_CACHE_LIMIT = 1024;
+	// (every row, label and button measures the same strings every frame). Bounded LRU so
+	// eviction removes the least useful entries instead of dropping the whole cache at once.
+	private static final int TEXT_METRIC_CACHE_LIMIT = 2048;
+	private final LinkedHashMap<String, Float> textWidthCache = new LinkedHashMap<String, Float>(64, 0.75F, true) {
+		private static final long serialVersionUID = 1L;
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<String, Float> eldest) {
+			return size() > TEXT_METRIC_CACHE_LIMIT;
+		}
+	};
+	private final LinkedHashMap<String, Float> textHeightCache = new LinkedHashMap<String, Float>(64, 0.75F, true) {
+		private static final long serialVersionUID = 1L;
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<String, Float> eldest) {
+			return size() > TEXT_METRIC_CACHE_LIMIT;
+		}
+	};
 	
 	private long nvg;
 	
@@ -481,10 +497,6 @@ public class NanoVGManager {
 	    
 	    float width = bounds[2] - bounds[0];
 	    
-	    if (textWidthCache.size() > TEXT_WIDTH_CACHE_LIMIT) {
-	    	textWidthCache.clear();
-	    }
-	    
 	    textWidthCache.put(key, width);
 	    
 	    return width;
@@ -493,13 +505,25 @@ public class NanoVGManager {
 	
 	public float getTextHeight(String text, float size, Font font) {
 		
+		String key = font.getName() + ':' + size + ':' + text;
+		
+		Float cached = textHeightCache.get(key);
+		
+		if (cached != null) {
+			return cached;
+		}
+		
 	    float[] bounds = new float[4];
 	    
 	    NanoVG.nvgFontSize(nvg, size);
 	    NanoVG.nvgFontFace(nvg, font.getName());
 	    NanoVG.nvgTextBounds(nvg, 0, 0, text, bounds);
-
-	    return bounds[3] - bounds[1];
+	    
+	    float height = bounds[3] - bounds[1];
+	    
+	    textHeightCache.put(key, height);
+	
+	    return height;
 	}
 
 	public float getTextBoxHeight(String text, float size, Font font, float maxWidth) {

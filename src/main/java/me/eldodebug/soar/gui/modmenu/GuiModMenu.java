@@ -29,6 +29,7 @@ import me.eldodebug.soar.management.nanovg.NanoVGManager;
 import me.eldodebug.soar.management.nanovg.font.Fonts;
 import me.eldodebug.soar.management.nanovg.font.LegacyIcon;
 import me.eldodebug.soar.ui.CommandPalette;
+import me.eldodebug.soar.ui.ambient.AmbientBackdrop;
 import me.eldodebug.soar.ui.comp.impl.field.CompSearchBox;
 import me.eldodebug.soar.utils.MathUtils;
 import me.eldodebug.soar.utils.animation.simple.SimpleAnimation;
@@ -63,6 +64,8 @@ public class GuiModMenu extends GuiScreen {
 	
 	private CompSearchBox searchBox = new CompSearchBox();
 	
+	private final AmbientBackdrop ambient = new AmbientBackdrop();
+	
 	private CommandPalette commandPalette = new CommandPalette();
 	
 	public GuiModMenu() {
@@ -94,6 +97,7 @@ public class GuiModMenu extends GuiScreen {
 		introSpring.setValue(0.0D);
 		closing = false;
 		introLastFrameNanos = 0L;
+		ambient.reset();
 		
 		for(Category c : categories) {
 			c.initGui();
@@ -156,6 +160,7 @@ public class GuiModMenu extends GuiScreen {
 		
 		if(InternalSettingsMod.getInstance().getBlurSetting().isToggled()) BlurUtils.drawBlurScreen(intro * 20 + 1F);
 		screenAnimation.wrap(() -> {
+			ambient.draw(nvg, mouseX, mouseY);
 			nvg.drawShadow(x, y, width, height, 12);
 		}, 0.94F + 0.06F * intro, intro);
 		

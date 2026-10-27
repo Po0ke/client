@@ -367,7 +367,11 @@ public class MorphCursor {
 		ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
 
 		float padding = 6.0F;
-		float width = nvg.getTextWidth(tooltipText, 8, Fonts.REGULAR) + (padding * 2.0F);
+
+		// Keep very long labels (module descriptions) on one screen-width-bounded line.
+		String text = nvg.getLimitText(tooltipText, 8, Fonts.REGULAR, Math.max(120.0F, sr.getScaledWidth() * 0.42F));
+
+		float width = nvg.getTextWidth(text, 8, Fonts.REGULAR) + (padding * 2.0F);
 		float height = 16.0F;
 
 		float tooltipX = preciseX + 14.0F;
@@ -387,7 +391,7 @@ public class MorphCursor {
 		float totalAlpha = alpha * globalAlpha;
 
 		nvg.drawRoundedRect(tooltipX, tooltipY, width, height, 4, new Color(20, 20, 24, clampAlpha((int) (235.0F * totalAlpha))));
-		nvg.drawText(tooltipText, tooltipX + padding, tooltipY + 4.0F, new Color(235, 235, 240, clampAlpha((int) (255.0F * totalAlpha))), 8, Fonts.REGULAR);
+		nvg.drawText(text, tooltipX + padding, tooltipY + 4.0F, new Color(235, 235, 240, clampAlpha((int) (255.0F * totalAlpha))), 8, Fonts.REGULAR);
 	}
 
 	private void updatePrecisePosition(int mouseX, int mouseY) {
