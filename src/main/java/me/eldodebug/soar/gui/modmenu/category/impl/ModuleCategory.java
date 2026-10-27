@@ -67,6 +67,7 @@ public class ModuleCategory extends Category {
 	private static final float LIST_TOP = 36F;
 	
 	private final ArrayList<Mod> orderedMods = new ArrayList<Mod>();
+	private final SimpleAnimation scrollbarAnimation = new SimpleAnimation();
 	
 	private Mod pressedMod;
 	private Mod lastClickedMod;
@@ -262,6 +263,9 @@ public class ModuleCategory extends Category {
 		}
 		
 		nvg.restore();
+		
+		drawScrollbar(nvg, accentColor);
+		
 		nvg.drawVerticalGradientRect(getX() + 15,  this.getY(), getWidth() - 30, 12,  palette.getBackgroundColor(ColorType.NORMAL), noColour); //top
 		nvg.drawVerticalGradientRect(getX() + 15,  this.getY()+ this.getHeight() - 12, getWidth() - 30, 12, noColour, palette.getBackgroundColor(ColorType.NORMAL)); // bottom
 		nvg.restore();
@@ -820,6 +824,32 @@ public class ModuleCategory extends Category {
 	
 	private float clamp01(float value) {
 		return Math.max(0.0F, Math.min(1.0F, value));
+	}
+	
+	private void drawScrollbar(NanoVGManager nvg, AccentColor accentColor) {
+		
+		float max = scroll.getMaxScroll();
+		
+		scrollbarAnimation.setAnimation(max > 0.0F ? 1.0F : 0.0F, 18);
+		
+		float alpha = scrollbarAnimation.getValue();
+		
+		if(alpha < 0.02F) {
+			return;
+		}
+		
+		float trackX = this.getX() + this.getWidth() - 9.0F;
+		float trackY = this.getY() + LIST_TOP;
+		float trackHeight = this.getHeight() - LIST_TOP - 6.0F;
+		float content = trackHeight + max;
+		float thumbHeight = Math.max(24.0F, trackHeight * (trackHeight / content));
+		float progress = Math.max(0.0F, Math.min(1.0F, -scroll.getValue() / max));
+		float thumbY = trackY + (progress * (trackHeight - thumbHeight));
+		
+		nvg.drawRoundedRect(trackX, trackY, 2.5F, trackHeight, 1.25F, new Color(255, 255, 255, (int) (18 * alpha)));
+		nvg.drawGradientRoundedRect(trackX, thumbY, 2.5F, thumbHeight, 1.25F,
+				ColorUtils.applyAlpha(accentColor.getColor1(), (int) (170 * alpha)),
+				ColorUtils.applyAlpha(accentColor.getColor2(), (int) (170 * alpha)));
 	}
 	
 	private String getCategoryIcon(ModCategory category) {

@@ -110,6 +110,10 @@ public class Scroll {
 	public void setMaxScroll(float scroll) {
 		maxScroll = scroll;
 	}
+	
+	public float getMaxScroll() {
+		return maxScroll;
+	}
 
 	public float getValue() {
 		return scrollAnimation.getValue();
