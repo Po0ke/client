@@ -79,6 +79,8 @@ public class ModuleCategory extends Category {
 	
 	private Mod contextMod;
 	private float contextX, contextY;
+	private boolean pinnedOnly;
+	private final SimpleAnimation pinnedAnimation = new SimpleAnimation();
 	private static final float CTX_WIDTH = 124;
 	private static final float CTX_ITEM = 20;
 	private static final float CTX_PAD = 4;
@@ -109,6 +111,7 @@ public class ModuleCategory extends Category {
 		pressedMod = null;
 		contextMod = null;
 		keyboardMod = null;
+		pinnedOnly = false;
 	}
 	
 	@Override
@@ -160,10 +163,26 @@ public class ModuleCategory extends Category {
 			
 			nvg.drawText(c.getName(), this.getX() + 15 + offsetX + ((textWidth + 20) - textWidth) / 2, this.getY() + offsetY + 1.5F, textColor, 9, Fonts.MEDIUM);
 			
-			MorphCursor.getInstance().hover(this.getX() + 15 + offsetX, this.getY() + offsetY - 3 + scrollValue, textWidth + 20, 16, 6);
+			MorphCursor.getInstance().hover(this.getX() + 15 + offsetX, this.getY() + offsetY - 3 + scrollValue, textWidth + 20, 16, 6, c.getName());
 			
 			offsetX+=textWidth + 28;
 		}
+		
+		// A pinned-only filter sits at the right end of the category row, out of the chip flow.
+		float pinnedX = this.getX() + this.getWidth() - 27;
+		float pinnedY = this.getY() + offsetY - 3;
+		float pinnedWidth = 16;
+		float pinnedHeight = 16;
+		
+		pinnedAnimation.setAnimation(pinnedOnly ? 1.0F : 0.0F, 16);
+		
+		nvg.drawRoundedRect(pinnedX, pinnedY, pinnedWidth, pinnedHeight, 6, palette.getBackgroundColor(ColorType.DARK));
+		nvg.drawGradientRoundedRect(pinnedX, pinnedY, pinnedWidth, pinnedHeight, 6,
+				ColorUtils.applyAlpha(accentColor.getColor1(), (int) (pinnedAnimation.getValue() * 255)),
+				ColorUtils.applyAlpha(accentColor.getColor2(), (int) (pinnedAnimation.getValue() * 255)));
+		nvg.drawCenteredText(pinnedOnly ? LegacyIcon.STAR_FILL : LegacyIcon.STAR, pinnedX + (pinnedWidth / 2.0F), pinnedY + 4,
+				pinnedOnly ? Color.WHITE : palette.getFontColor(ColorType.NORMAL), 9, Fonts.LEGACYICON);
+		MorphCursor.getInstance().hover(pinnedX, pinnedY + scrollValue, pinnedWidth, pinnedHeight, 6, "Show only pinned modules");
 		
 		offsetY = offsetY + 23;
 		
@@ -474,6 +493,11 @@ public class ModuleCategory extends Category {
 				}
 				
 				offsetX+=textWidth + 28;
+			}
+			
+			if(mouseButton == 0 && MouseUtils.isInside(mouseX, mouseY, this.getX() + this.getWidth() - 27, this.getY() + offsetY - 3, 16, 16)) {
+				pinnedOnly = !pinnedOnly;
+				scroll.reset();
 			}
 			
 			offsetY = offsetY + 23;
@@ -1023,6 +1047,10 @@ public class ModuleCategory extends Category {
 		for(Mod mod : modManager.getMods()) {
 			
 			if(filterMod(mod)) {
+				continue;
+			}
+			
+			if(pinnedOnly && !Favourites.isPinned(mod)) {
 				continue;
 			}
 			
