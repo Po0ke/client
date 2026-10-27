@@ -118,6 +118,16 @@ public class GuiModMenu extends GuiScreen {
 		paletteActions.add(new CommandPalette.Action("Edit HUD", "Open the HUD editor", this::openHudEditor));
 		paletteActions.add(new CommandPalette.Action("Notification History", "Open the notification centre",
 				() -> notificationCenter.open(x, y, width, height)));
+		paletteActions.add(new CommandPalette.Action("Open Profiles", "Switch to the profile scene",
+				() -> openCategory(ProfileCategory.class)));
+		paletteActions.add(new CommandPalette.Action("Open Cosmetics", "Switch to the cosmetics scene",
+				() -> openCategory(CosmeticsCategory.class)));
+		paletteActions.add(new CommandPalette.Action("Open Screenshots", "Switch to the screenshot scene",
+				() -> openCategory(ScreenshotCategory.class)));
+		paletteActions.add(new CommandPalette.Action("Open Settings", "Switch to the settings scene",
+				() -> openCategory(SettingCategory.class)));
+		paletteActions.add(new CommandPalette.Action("Open Modules", "Switch to the module list",
+				() -> openCategory(ModuleCategory.class)));
 		paletteActions.add(new CommandPalette.Action("Toggle UI Blur", "Background blur on or off",
 				() -> InternalSettingsMod.getInstance().getBlurSetting().setToggled(!InternalSettingsMod.getInstance().getBlurSetting().isToggled())));
 		
@@ -464,6 +474,18 @@ public class GuiModMenu extends GuiScreen {
 		toEditHUD = true;
 		canClose = false;
 		beginClose();
+	}
+	
+	private void openCategory(Class<?> clazz) {
+		
+		Category category = getCategoryByClass(clazz);
+		
+		if(category == null || category == currentCategory) {
+			return;
+		}
+		
+		categoryTransitionDirection = categories.indexOf(category) >= categories.indexOf(currentCategory) ? 1 : -1;
+		currentCategory = category;
 	}
 	
 	private void beginClose() {
