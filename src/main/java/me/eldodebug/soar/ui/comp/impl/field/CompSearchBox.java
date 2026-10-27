@@ -12,6 +12,7 @@ import me.eldodebug.soar.management.nanovg.font.Fonts;
 import me.eldodebug.soar.management.nanovg.font.LegacyIcon;
 import me.eldodebug.soar.utils.TimerUtils;
 import me.eldodebug.soar.utils.animation.simple.SimpleAnimation;
+import me.eldodebug.soar.utils.mouse.MouseUtils;
 
 public class CompSearchBox extends CompTextBoxBase {
 
@@ -110,11 +111,33 @@ public class CompSearchBox extends CompTextBoxBase {
 			}
 		}
 		
+		if(!text.isEmpty()) {
+			float clearX = this.getX() + this.getWidth() - 15;
+			float clearY = this.getY() + ((this.getHeight() - 12) / 2.0F);
+			boolean clearHovered = MouseUtils.isInside(mouseX, mouseY, clearX - 2, clearY - 2, 14, 14);
+			
+			nvg.drawCenteredText(LegacyIcon.X, clearX + 5, clearY + 2,
+					clearHovered ? palette.getFontColor(ColorType.DARK) : palette.getFontColor(ColorType.NORMAL), 8, Fonts.LEGACYICON);
+		}
+		
 		nvg.restore();
 	}
 	
 	@Override
 	public void mouseClicked(int mouseX, int mouseY, int mouseButton) {
+		
+		if(mouseButton == 0 && !this.getText().isEmpty()) {
+			
+			float clearX = this.getX() + this.getWidth() - 15;
+			float clearY = this.getY() + ((this.getHeight() - 12) / 2.0F);
+			
+			if(MouseUtils.isInside(mouseX, mouseY, clearX - 2, clearY - 2, 14, 14)) {
+				this.setText("");
+				this.setFocused(true);
+				return;
+			}
+		}
+		
 		super.mouseClicked(mouseX, mouseY, mouseButton);
 	}
 	
