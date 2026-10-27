@@ -71,6 +71,7 @@ public class ModuleCategory extends Category {
 	
 	private Mod pressedMod;
 	private Mod lastClickedMod;
+	private Mod keyboardMod;
 	private long categoryOpenedAt;
 	
 	private boolean emptyStateVisible;
@@ -107,6 +108,7 @@ public class ModuleCategory extends Category {
 		lastClickedMod = null;
 		pressedMod = null;
 		contextMod = null;
+		keyboardMod = null;
 	}
 	
 	@Override
@@ -203,6 +205,11 @@ public class ModuleCategory extends Category {
 				
 				if(hover > 0.01F) {
 					nvg.drawRoundedRect(rowX, this.getY() + offsetY, rowWidth, 40, 8, ColorUtils.applyAlpha(accentColor.getColor1(), (int) (hover * UiTokens.TINT_HOVER)));
+				}
+				
+				if(keyboardMod == m && !hovered) {
+					nvg.drawOutlineRoundedRect(rowX, this.getY() + offsetY, rowWidth, 40, 8, 1.2F,
+							ColorUtils.applyAlpha(accentColor.getColor1(), 170));
 				}
 				
 				nvg.drawRoundedRect(this.getX() + 21, this.getY() + offsetY + 6, 28, 28, 6, palette.getBackgroundColor(ColorType.NORMAL));
@@ -725,8 +732,61 @@ public class ModuleCategory extends Category {
 			openSetting = false;
 		}
 		if(!openSetting) {
+			
+			if(keyCode == Keyboard.KEY_DOWN || keyCode == Keyboard.KEY_UP) {
+				moveKeyboardSelection(keyCode == Keyboard.KEY_DOWN ? 1 : -1);
+				return;
+			}
+			
+			if(keyCode == Keyboard.KEY_RETURN && keyboardMod != null && orderedMods.contains(keyboardMod)) {
+				
+				boolean shift = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+				
+				if(shift) {
+					openSettings(keyboardMod);
+				} else {
+					toggleRow(keyboardMod);
+				}
+				
+				return;
+			}
+			
 			scroll.onKey(keyCode);
 			if(keyCode != 0xD0 && keyCode != 0xC8 && keyCode != Keyboard.KEY_ESCAPE) this.getSearchBox().setFocused(true);
+		}
+	}
+	
+	private void moveKeyboardSelection(int direction) {
+		
+		if(orderedMods.isEmpty()) {
+			keyboardMod = null;
+			return;
+		}
+		
+		int index = keyboardMod == null ? -1 : orderedMods.indexOf(keyboardMod);
+		int next;
+		
+		if(index < 0) {
+			next = direction > 0 ? 0 : orderedMods.size() - 1;
+		} else {
+			next = Math.max(0, Math.min(orderedMods.size() - 1, index + direction));
+		}
+		
+		keyboardMod = orderedMods.get(next);
+		ensureVisible(next);
+	}
+	
+	private void ensureVisible(int index) {
+		
+		float offset = scroll.getValue();
+		float rowTop = LIST_TOP + (index * ROW_PITCH);
+		float visibleTop = LIST_TOP - offset;
+		float visibleBottom = this.getHeight() - offset - 4.0F;
+		
+		if(rowTop < visibleTop) {
+			scroll.manualScroll(Math.round(visibleTop - rowTop));
+		} else if(rowTop + ROW_PITCH > visibleBottom) {
+			scroll.manualScroll(Math.round(visibleBottom - (rowTop + ROW_PITCH)));
 		}
 	}
 	
