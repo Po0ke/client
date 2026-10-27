@@ -22,6 +22,7 @@ import me.eldodebug.soar.utils.MathUtils;
 import me.eldodebug.soar.utils.animation.normal.Animation;
 import me.eldodebug.soar.utils.animation.normal.Direction;
 import me.eldodebug.soar.utils.animation.normal.easing.EaseBackIn;
+import me.eldodebug.soar.utils.mouse.MorphCursor;
 import me.eldodebug.soar.utils.mouse.MouseUtils;
 import me.eldodebug.soar.utils.render.BlurUtils;
 import net.minecraft.client.gui.GuiScreen;
@@ -70,6 +71,9 @@ public class GuiEditHUD extends GuiScreen {
 		flingVelocityX = 0.0F;
 		flingVelocityY = 0.0F;
 		lastFrameNanos = 0L;
+		
+		MorphCursor.getInstance().setEnabled(InternalSettingsMod.getInstance().getMorphCursorSetting().isToggled());
+		MorphCursor.getInstance().refreshNativeCursor();
 	}
 	
 	@Override
@@ -82,6 +86,13 @@ public class GuiEditHUD extends GuiScreen {
 		boolean shift = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
 		localMouseX = mouseX;
 		localMouseY = mouseY;
+		
+		MorphCursor morphCursor = MorphCursor.getInstance();
+		
+		if(morphCursor.isEnabled()) {
+			morphCursor.beginFrame(mouseX, mouseY);
+			morphCursor.setGlobalAlpha(Math.max(0.0F, Math.min(1.0F, (float) introAnimation.getValue())));
+		}
 
 	    snapping = false;
 	    
@@ -271,15 +282,26 @@ public class GuiEditHUD extends GuiScreen {
 				}
 				
 				nvg.drawOutlineRoundedRect(m.getX() - 2, m.getY() - 2, m.getWidth() + 4, m.getHeight() + 4, 6.5F * m.getScale(), 2, palette.getBackgroundColor(ColorType.DARK, (int) (m.getAnimation().getValue() * 255)));
+				
+				if(m.isToggled() && !m.isHide() && morphCursor.isEnabled()) {
+					morphCursor.hover(m.getX() - 2, m.getY() - 2, m.getWidth() + 4, m.getHeight() + 4,
+							6.5F * m.getScale(), m.getName());
+				}
 			}
 		});
 		
 		new EventRender2D(partialTicks).call();
 		new EventRenderNotification().call();
+		
+		if(morphCursor.isEnabled()) {
+			morphCursor.draw();
+		}
 	}
 	
 	@Override
 	public void mouseClicked(int mouseX, int mouseY, int mouseButton) {
+		
+		MorphCursor.getInstance().onMouseDown();
 		
 		for(HUDMod m : mods) {
 			if(m.isToggled() && !m.isHide()) {
@@ -331,6 +353,8 @@ public class GuiEditHUD extends GuiScreen {
 	
 	@Override
 	public void mouseReleased(int mouseX, int mouseY, int mouseButton) {
+		
+		MorphCursor.getInstance().onMouseUp();
 		
 		if(dragTarget != null) {
 			
@@ -474,6 +498,11 @@ public class GuiEditHUD extends GuiScreen {
 	@Override
 	public boolean doesGuiPauseGame() {
 		return false;
+	}
+	
+	@Override
+	public void onGuiClosed() {
+		MorphCursor.getInstance().onScreenClosed();
 	}
 	
 	private static class UndoEntry {
