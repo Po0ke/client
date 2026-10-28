@@ -53,4 +53,8 @@ public class SettingScene {
 	public int getHeight() {
 		return parent.getSceneHeight();
 	}
+
+	public SettingCategory getParent() {
+		return parent;
+	}
 }

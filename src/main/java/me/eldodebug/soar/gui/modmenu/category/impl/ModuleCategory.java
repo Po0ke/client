@@ -163,7 +163,9 @@ public class ModuleCategory extends Category {
 			
 			nvg.drawText(c.getName(), this.getX() + 15 + offsetX + ((textWidth + 20) - textWidth) / 2, this.getY() + offsetY + 1.5F, textColor, 9, Fonts.MEDIUM);
 			
-			MorphCursor.getInstance().hover(this.getX() + 15 + offsetX, this.getY() + offsetY - 3 + scrollValue, textWidth + 20, 16, 6, c.getName());
+			if(!openSetting) {
+				MorphCursor.getInstance().hover(this.getX() + 15 + offsetX, this.getY() + offsetY - 3 + scrollValue, textWidth + 20, 16, 6, c.getName());
+			}
 			
 			offsetX+=textWidth + 28;
 		}
@@ -182,7 +184,9 @@ public class ModuleCategory extends Category {
 				ColorUtils.applyAlpha(accentColor.getColor2(), (int) (pinnedAnimation.getValue() * 255)));
 		nvg.drawCenteredText(pinnedOnly ? LegacyIcon.STAR_FILL : LegacyIcon.STAR, pinnedX + (pinnedWidth / 2.0F), pinnedY + 4,
 				pinnedOnly ? Color.WHITE : palette.getFontColor(ColorType.NORMAL), 9, Fonts.LEGACYICON);
-		MorphCursor.getInstance().hover(pinnedX, pinnedY + scrollValue, pinnedWidth, pinnedHeight, 6, "Show only pinned modules");
+		if(!openSetting) {
+			MorphCursor.getInstance().hover(pinnedX, pinnedY + scrollValue, pinnedWidth, pinnedHeight, 6, "Show only pinned modules");
+		}
 		
 		offsetY = offsetY + 23;
 		
@@ -275,11 +279,15 @@ public class ModuleCategory extends Category {
 				
 				nvg.restore();
 				
-				MorphCursor.getInstance().hover(rowX, this.getY() + offsetY + scrollValue, rowWidth, 40, 8, descriptionCut ? fullDescription : null);
-				MorphCursor.getInstance().hover(right - 70, this.getY() + offsetY + 11 + scrollValue, 18, 18, 4, pinned ? "Unpin module" : "Pin module");
+				float localTop = offsetY + scrollValue;
 				
-				if(modManager.getSettingsByMod(m) != null) {
-					MorphCursor.getInstance().hover(right - 44, this.getY() + offsetY + 9 + scrollValue, 22, 22, 6, "Module settings");
+				if(!openSetting && rowInteractive(localTop)) {
+					MorphCursor.getInstance().hover(rowX, this.getY() + localTop, rowWidth, 40, 8, descriptionCut ? fullDescription : null);
+					MorphCursor.getInstance().hover(right - 70, this.getY() + offsetY + 11 + scrollValue, 18, 18, 4, pinned ? "Unpin module" : "Pin module");
+					
+					if(modManager.getSettingsByMod(m) != null) {
+						MorphCursor.getInstance().hover(right - 44, this.getY() + offsetY + 9 + scrollValue, 22, 22, 6, "Module settings");
+					}
 				}
 			}
 		}
@@ -335,6 +343,10 @@ public class ModuleCategory extends Category {
 			nvg.scissor(this.getX() + 15, this.getY() + offsetY, this.getWidth() - 30, this.getHeight() - 59);
 			nvg.translate(0, settingScroll.getValue());
 			
+			if(settingsInteractive) {
+				MorphCursor.getInstance().pushClip(this.getX() + 15, this.getY() + offsetY, this.getWidth() - 30, this.getHeight() - 59);
+			}
+			
 			for(ModuleSetting s : comps) {
 				
 				s.openAnimation.setAnimation(s.openY, 16);
@@ -352,7 +364,9 @@ public class ModuleCategory extends Category {
 						float iconY = this.getY() + offsetY + 11 + s.openAnimation.getValue();
 						
 						nvg.drawText(LegacyIcon.INFO, iconX, iconY, new Color(255, 145, 0), 8, Fonts.LEGACYICON);
-						MorphCursor.getInstance().hover(iconX - 2, iconY - 4, 11, 12, 3, "Also bound to " + conflict);
+						if(settingsInteractive) {
+							MorphCursor.getInstance().hover(iconX - 2, iconY - 4, 11, 12, 3, "Also bound to " + conflict);
+						}
 					}
 				}
 				
@@ -440,6 +454,10 @@ public class ModuleCategory extends Category {
 				}
 			}
 			
+			if(settingsInteractive) {
+				MorphCursor.getInstance().popClip();
+			}
+			
 			nvg.restore();
 			
 			settingScroll.setMaxScroll(this.getModuleSettingHeight());
@@ -449,8 +467,24 @@ public class ModuleCategory extends Category {
 		
 		drawContextMenu(nvg, palette, accentColor, mouseX, mouseY);
 		
+		updateScrollBounds();
+	}
+	
+	private void updateScrollBounds() {
 		int visibleCount = orderedMods.size();
-		scroll.setMaxScroll((visibleCount - (visibleCount > 5 ? 5.18F : visibleCount)) * 50);
+		float contentHeight = LIST_TOP + (Math.max(0, visibleCount - 1) * ROW_PITCH) + 40.0F + 8.0F;
+		scroll.setMaxScroll(Math.max(0.0F, contentHeight - this.getHeight()));
+	}
+	
+	/**
+	 * A row only becomes interactive once a useful part of it is inside the list viewport.
+	 * This keeps the cursor from latching onto a row hidden under the header or below the
+	 * bottom edge while the list is scrolling.
+	 */
+	private boolean rowInteractive(float localTop) {
+		float visibleTop = Math.max(localTop, 0.0F);
+		float visibleBottom = Math.min(localTop + 40.0F, this.getHeight() - 6.0F);
+		return visibleBottom - visibleTop >= 18.0F;
 	}
 	
 	@Override
@@ -512,6 +546,11 @@ public class ModuleCategory extends Category {
 			}
 			
 			for(Mod m : orderedMods) {
+				
+				if(!rowInteractive(offsetY)) {
+					offsetY+=50;
+					continue;
+				}
 				
 				if(mouseButton == 1 && MouseUtils.isInside(mouseX, mouseY, this.getX() + 15, this.getY() + offsetY, this.getWidth() - 30, 40)) {
 					contextMod = m;
@@ -655,6 +694,10 @@ public class ModuleCategory extends Category {
 							currentMod = m;
 							openSetting = true;
 							this.setCanClose(false);
+							
+							// The settings layout reuses offsetY; stop walking the list so the
+							// same click cannot also toggle whatever row follows in the loop.
+							return;
 						}
 					}
 				}
@@ -896,14 +939,21 @@ public class ModuleCategory extends Category {
 		this.getSearchBox().setFocused(false);
 		this.scroll.resetAll();
 		rebuildOrderedMods();
-		
+		updateScrollBounds();
 		int index = orderedMods.indexOf(mod);
 		
 		if(index < 0) {
 			return;
 		}
 		
-		mouseClicked(this.getX() + this.getWidth() - 33, (int) (this.getY() + LIST_TOP + (index * ROW_PITCH) + 20), 0);
+		// Bring the row into view before synthesising the gear click. Without this, opening a
+		// module from the command palette silently failed whenever the row was below the fold.
+		float rowTop = LIST_TOP + (index * ROW_PITCH);
+		float targetScroll = Math.max(-scroll.getMaxScroll(), Math.min(0.0F, -(rowTop - LIST_TOP)));
+		scroll.setScrollPosition(targetScroll);
+		
+		int clickY = (int) (this.getY() + rowTop + targetScroll + 20.0F);
+		mouseClicked(this.getX() + this.getWidth() - 33, clickY, 0);
 	}
 	
 	private float clamp01(float value) {
@@ -1159,7 +1209,9 @@ public class ModuleCategory extends Category {
 		clearSearchHeight = height;
 		emptyStateVisible = true;
 		
-		MorphCursor.getInstance().hover(x, y + scrollValue, width, height, 6, "Clear the search");
+		if(!openSetting) {
+			MorphCursor.getInstance().hover(x, y + scrollValue, width, height, 6, "Clear the search");
+		}
 	}
 	
 	private boolean filterMod(Mod m) {

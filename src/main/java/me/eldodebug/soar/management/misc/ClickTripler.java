@@ -55,6 +55,77 @@ public class ClickTripler {
 	}
 
 	/**
+	 * Best-effort start command for the setup card. The helper is deliberately not started by
+	 * the client, but showing the exact command removes the "what do I do with this?" moment.
+	 */
+	public static String getSuggestedCommand() {
+
+		String home = System.getProperty("user.home", "");
+
+		String[] candidates = new String[] {
+				new File(home, "click-tripler/target/release/click-tripler").getPath(),
+				new File(home, ".local/bin/click-tripler").getPath(),
+				new File(home, ".cargo/bin/click-tripler").getPath(),
+				"/usr/local/bin/click-tripler",
+				"/usr/bin/click-tripler"
+		};
+
+		String helper = "click-tripler";
+
+		for (String candidate : candidates) {
+			if (new File(candidate).isFile()) {
+				helper = candidate;
+				break;
+			}
+		}
+
+		return "sudo " + helper + " " + findMouseDevice() + " 40";
+	}
+
+	private static String findMouseDevice() {
+
+		File byId = new File("/dev/input/by-id");
+
+		File[] entries = byId.listFiles();
+
+		if (entries != null) {
+
+			String fallback = null;
+
+			for (File entry : entries) {
+
+				String name = entry.getName().toLowerCase(Locale.ENGLISH);
+
+				if (!name.endsWith("-event-mouse")) {
+					continue;
+				}
+
+				String path = entry.getPath();
+
+				try {
+					path = entry.toPath().toRealPath().toString();
+				} catch (IOException ignored) {
+					// Keep the by-id symlink; it works just as well.
+				}
+
+				if (name.contains("g502")) {
+					return path;
+				}
+
+				if (fallback == null) {
+					fallback = path;
+				}
+			}
+
+			if (fallback != null) {
+				return fallback;
+			}
+		}
+
+		return "/dev/input/eventX";
+	}
+
+	/**
 	 * Writes the state file if anything changed. Safe to call every frame.
 	 */
 	public static void sync(boolean enabled, int minDelayMs, int maxDelayMs) {

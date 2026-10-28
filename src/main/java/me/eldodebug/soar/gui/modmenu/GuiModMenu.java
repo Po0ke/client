@@ -131,11 +131,6 @@ public class GuiModMenu extends GuiScreen {
 		paletteActions.add(new CommandPalette.Action("Toggle UI Blur", "Background blur on or off",
 				() -> InternalSettingsMod.getInstance().getBlurSetting().setToggled(!InternalSettingsMod.getInstance().getBlurSetting().isToggled())));
 		
-		if(ClickTripler.isSupported()) {
-			paletteActions.add(new CommandPalette.Action("Toggle Click Tripler", "Third click on fast double clicks",
-					() -> InternalSettingsMod.getInstance().getClickTriplerSetting().setToggled(!InternalSettingsMod.getInstance().getClickTriplerSetting().isToggled())));
-		}
-		
 		commandPalette.setActions(paletteActions);
 		commandPalette.setSettingsListener(mod -> {
 			
@@ -269,46 +264,20 @@ public class GuiModMenu extends GuiScreen {
 					c.setCanClose(true);
 				}
 				
-				if(c.isShowSearchBox()) {
-					searchBox.setPosition(x + width - 175, y + 6.5F, 160, 18);
-					searchBox.draw(mouseX, mouseY, partialTicks);
-					MorphCursor.getInstance().hover(searchBox.getX(), searchBox.getY(), searchBox.getWidth(), searchBox.getHeight(), 6);
-				}
 				int yOff = (currentCategory.isShowTitle()) ? 31 : 0;
 				
-				float bellX = x + width - 199;
-				float bellY = y + 6.5F;
-				int unread = instance.getNotificationManager().getUnread();
-				boolean bellHovered = MouseUtils.isInside(mouseX, mouseY, bellX, bellY, 18, 18);
-				
-				nvg.drawRoundedRect(bellX, bellY, 18, 18, 6,
-						bellHovered ? palette.getBackgroundColor(ColorType.NORMAL) : palette.getBackgroundColor(ColorType.DARK));
-				nvg.drawCenteredText(LegacyIcon.BELL, bellX + 9.0F, bellY + 5.0F,
-						unread > 0 ? currentColor.getInterpolateColor() : palette.getFontColor(ColorType.NORMAL), 10, Fonts.LEGACYICON);
-				
-				if(unread > 0) {
-					float badge = 8.0F;
-					nvg.drawGradientRoundedRect(bellX + 12, bellY - 2, badge, badge, badge / 2.0F, currentColor.getColor1(), currentColor.getColor2());
-					nvg.drawCenteredText(unread > 9 ? "9" : String.valueOf(unread), bellX + 12 + (badge / 2.0F), bellY,
-							Color.WHITE, 6, Fonts.MEDIUM);
-				}
-				
-				MorphCursor.getInstance().hover(bellX, bellY, 18, 18, 6, "Notifications (Ctrl+N)");
-				
-				if(Objects.equals(currentCategory.getNameKey(), TranslateText.COSMETICS.getKey())){
-					float folderButtonX = x + width - 221;
-					float folderButtonY = y + 6.5F;
-					nvg.drawRoundedRect(folderButtonX, folderButtonY, 18,18, 6, palette.getBackgroundColor(ColorType.DARK));
-					nvg.drawCenteredText(LegacyIcon.FOLDER,folderButtonX + 8.5F, folderButtonY + 9 - (nvg.getTextHeight(LegacyIcon.FOLDER, 9, Fonts.LEGACYICON)/2), palette.getFontColor(ColorType.NORMAL), 9, Fonts.LEGACYICON);
-					MorphCursor.getInstance().hover(folderButtonX, folderButtonY, 18, 18, 6, "Open cape folder");
-				}
 				nvg.scissor(x + 32, y + yOff, width - 32, height - yOff);
-				
 				// Content enters from the side the user navigated towards, not always downwards.
-				float entranceOffset = 1.0F - c.getCategoryAnimation().getValue();
-				nvg.translate(entranceOffset * 22.0F * categoryTransitionDirection, entranceOffset * 10.0F);
+				float entrance = 1.0F - c.getCategoryAnimation().getValue();
+				nvg.translate(entrance * 22.0F * categoryTransitionDirection, entrance * 10.0F);
+				
+				// Hover targets are clipped to the content area, and never to the strip under
+				// the search field and notification bell.
+				MorphCursor.getInstance().pushClip(x + 32, y + Math.max(yOff, 26), width - 32, height - Math.max(yOff, 26));
 				
 				c.drawScreen(mouseX, mouseY, partialTicks);
+				
+				MorphCursor.getInstance().popClip();
 				
 				nvg.restore();
 				
@@ -316,6 +285,8 @@ public class GuiModMenu extends GuiScreen {
 				c.setInitialized(false);
 			}
 		}
+		
+		drawHeader(nvg, palette, currentColor, mouseX, mouseY, partialTicks);
 		
 		if(!commandPalette.isOpen() && !notificationCenter.isOpen() && MouseUtils.isInside(mouseX, mouseY, x + 32, y + 31, width - 32, height - 31)) {
 			scroll.onScroll();
@@ -336,6 +307,54 @@ public class GuiModMenu extends GuiScreen {
 		}
 	}
 	
+	/**
+	 * The search field, notification bell and folder shortcut are painted after the scene so
+	 * no scene content can cover them. Their hover targets are registered after the scene too,
+	 * which keeps the cursor from latching onto a row that happens to sit underneath.
+	 */
+	private void drawHeader(NanoVGManager nvg, ColorPalette palette, AccentColor currentColor,
+			int mouseX, int mouseY, float partialTicks) {
+
+		Glide instance = Glide.getInstance();
+
+		if(currentCategory.isShowSearchBox()) {
+			searchBox.setPosition(x + width - 175, y + 6.5F, 160, 18);
+			searchBox.draw(mouseX, mouseY, partialTicks);
+		}
+
+		float bellX = x + width - (currentCategory.isShowSearchBox() ? 199 : 26);
+		float bellY = y + 6.5F;
+		int unread = instance.getNotificationManager().getUnread();
+		boolean bellHovered = MouseUtils.isInside(mouseX, mouseY, bellX, bellY, 18, 18);
+
+		nvg.drawRoundedRect(bellX, bellY, 18, 18, 6,
+				bellHovered ? palette.getBackgroundColor(ColorType.NORMAL) : palette.getBackgroundColor(ColorType.DARK));
+		nvg.drawCenteredText(LegacyIcon.BELL, bellX + 9.0F, bellY + 4.0F,
+				unread > 0 ? currentColor.getInterpolateColor() : palette.getFontColor(ColorType.NORMAL), 10, Fonts.LEGACYICON);
+
+		if(unread > 0) {
+			float badge = 8.0F;
+			nvg.drawGradientRoundedRect(bellX + 12, bellY - 2, badge, badge, badge / 2.0F, currentColor.getColor1(), currentColor.getColor2());
+			nvg.drawCenteredText(unread > 9 ? "9" : String.valueOf(unread), bellX + 12 + (badge / 2.0F), bellY - 1,
+					Color.WHITE, 6, Fonts.MEDIUM);
+		}
+
+		if(Objects.equals(currentCategory.getNameKey(), TranslateText.COSMETICS.getKey())) {
+			float folderButtonX = x + width - 221;
+			float folderButtonY = y + 6.5F;
+			nvg.drawRoundedRect(folderButtonX, folderButtonY, 18, 18, 6, palette.getBackgroundColor(ColorType.DARK));
+			nvg.drawCenteredText(LegacyIcon.FOLDER, folderButtonX + 9.0F, folderButtonY + 4.5F,
+					palette.getFontColor(ColorType.NORMAL), 9, Fonts.LEGACYICON);
+			MorphCursor.getInstance().hover(folderButtonX, folderButtonY, 18, 18, 6, "Open cape folder");
+		}
+
+		if(currentCategory.isShowSearchBox()) {
+			MorphCursor.getInstance().hover(searchBox.getX(), searchBox.getY(), searchBox.getWidth(), searchBox.getHeight(), 6);
+		}
+
+		MorphCursor.getInstance().hover(bellX, bellY, 18, 18, 6, "Notifications (Ctrl+N)");
+	}
+
 	@Override
 	public void mouseClicked(int mouseX, int mouseY, int mouseButton) {
 		
@@ -373,7 +392,7 @@ public class GuiModMenu extends GuiScreen {
 			beginClose();
 		}
 		
-		if(MouseUtils.isInside(mouseX, mouseY, x + width - 199, y + 6.5F, 18, 18) && mouseButton == 0) {
+		if(MouseUtils.isInside(mouseX, mouseY, x + width - (currentCategory.isShowSearchBox() ? 199 : 26), y + 6.5F, 18, 18) && mouseButton == 0) {
 			commandPalette.close();
 			notificationCenter.open(x, y, width, height);
 			return;

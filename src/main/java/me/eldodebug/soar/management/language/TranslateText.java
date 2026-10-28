@@ -152,7 +152,15 @@ public enum TranslateText {
 	MORPH_CURSOR("text.morphcursor.name"), MORPH_CURSOR_DESCRIPTION("text.morphcursor.description"),
 	ADVANCED("text.advanced"), ADVANCED_DESCRIPTION("text.advanced.description"),
 	CLICK_TRIPLER("text.clicktripler.name"), CLICK_TRIPLER_DESCRIPTION("text.clicktripler.description"),
-	TRIPLER_MIN_DELAY("text.tripler.mindelay"), TRIPLER_MAX_DELAY("text.tripler.maxdelay");
+	TRIPLER_MIN_DELAY("text.tripler.mindelay"), TRIPLER_MAX_DELAY("text.tripler.maxdelay"),
+	MAGNETIC_CURSOR("text.magneticcursor.name"), MAGNETIC_CURSOR_DESCRIPTION("text.magneticcursor.description"), MAGNET_STRENGTH("text.magnetstrength"),
+	HOLD_TO_CONFIRM("text.holdtoconfirm.name"), HOLD_TO_CONFIRM_DESCRIPTION("text.holdtoconfirm.description"),
+	RADIAL_MENU("text.radialmenu.name"), RADIAL_MENU_DESCRIPTION("text.radialmenu.description"), RADIAL_MODULES("text.radial.modules"),
+	RADIAL_PROFILES("text.radial.profiles"), RADIAL_HOTBAR("text.radial.hotbar"), RADIAL_RADIUS("text.radial.radius"),
+	DYNAMIC_CROSSHAIR("text.dynamiccrosshair.name"), DYNAMIC_CROSSHAIR_DESCRIPTION("text.dynamiccrosshair.description"),
+	CROSSHAIR_TARGET_SHRINK("text.crosshair.targetshrink"), CROSSHAIR_HIT_FLASH("text.crosshair.hitflash"),
+	CROSSHAIR_SHAPE_SHIFT("text.crosshair.shapeshift"), CROSSHAIR_HIDE_VANILLA("text.crosshair.hidevanilla"),
+	KEYSTROKES_CPS("text.keystrokes.cps");
 
 	private String key, text;
 

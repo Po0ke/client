@@ -30,6 +30,12 @@ public class InternalSettingsMod extends Mod {
 
 	private final BooleanSetting morphCursorSetting = new BooleanSetting(TranslateText.MORPH_CURSOR, this, true);
 
+	private final BooleanSetting magneticCursorSetting = new BooleanSetting(TranslateText.MAGNETIC_CURSOR, this, true);
+
+	private final NumberSetting magnetStrengthSetting = new NumberSetting(TranslateText.MAGNET_STRENGTH, this, 0.35, 0, 1, false);
+
+	private final BooleanSetting holdToConfirmSetting = new BooleanSetting(TranslateText.HOLD_TO_CONFIRM, this, true);
+
 	private final BooleanSetting clickTriplerSetting = new BooleanSetting(TranslateText.CLICK_TRIPLER, this, true);
 
 	private final NumberSetting clickTriplerMinDelay = new NumberSetting(TranslateText.TRIPLER_MIN_DELAY, this, 10, 1, 500, true);
@@ -97,6 +103,12 @@ public class InternalSettingsMod extends Mod {
 	public BooleanSetting getBlurSetting() {return blurSetting;}
 
 	public BooleanSetting getMorphCursorSetting() {return morphCursorSetting;}
+
+	public BooleanSetting getMagneticCursorSetting() {return magneticCursorSetting;}
+
+	public NumberSetting getMagnetStrengthSetting() {return magnetStrengthSetting;}
+
+	public BooleanSetting getHoldToConfirmSetting() {return holdToConfirmSetting;}
 
 	public BooleanSetting getClickTriplerSetting() {return clickTriplerSetting;}
 

@@ -19,7 +19,7 @@ public class RestrictedMod {
         if (shouldCheck) {
             List<Server> servers = blm.getBlacklist();
             for (Server server : servers) {
-                if (currentServerIP.contains(server.getServerIp())) {
+                if (!server.getServerIp().isEmpty() && currentServerIP.contains(server.getServerIp())) {
                     List<String> blacklistedMods = server.getMods();
                     if (blacklistedMods.contains(m.getNameKey())) {
                         m.setAllowed(false);

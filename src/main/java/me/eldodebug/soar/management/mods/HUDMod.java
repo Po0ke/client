@@ -199,7 +199,9 @@ public class HUDMod extends Mod {
 		float x = this.x + (addX * scale);
 		float y = this.y + (addY * scale);
 
-		if (isBlur) ShBlur.getInstance().drawBlur(x,y,lastWidth,lastHeight,radius);
+		if (isBlur) {
+			ShBlur.getInstance().drawBlur(x, y, lastWidth, lastHeight, radius);
+		}
 
 		if(isNormal || isVanilla || isShadow || isDark || isLight || isModern) {
 			nvg.drawShadow(x, y, lastWidth, lastHeight, radius - 0.75F);
@@ -238,7 +240,6 @@ public class HUDMod extends Mod {
 		}
 
 	}
-
 	public void drawBackground(float width, float height) {
 		drawBackground(0, 0, width, height, 6 * scale);
 	}
@@ -288,7 +289,6 @@ public class HUDMod extends Mod {
 
 		NanoVGManager nvg = Glide.getInstance().getNanoVGManager();
 		float lastSize = size * scale;
-
 		nvg.drawCenteredText(text, x + (addX * scale), y + (addY * scale), color, lastSize, font);
 	}
 

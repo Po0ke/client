@@ -2,6 +2,7 @@ package me.eldodebug.soar.utils.mouse;
 
 import java.awt.Color;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Cursor;
@@ -10,6 +11,7 @@ import org.lwjgl.input.Mouse;
 import me.eldodebug.soar.Glide;
 import me.eldodebug.soar.logger.GlideLogger;
 import me.eldodebug.soar.management.color.AccentColor;
+import me.eldodebug.soar.management.mods.impl.InternalSettingsMod;
 import me.eldodebug.soar.management.nanovg.NanoVGManager;
 import me.eldodebug.soar.management.nanovg.font.Fonts;
 import me.eldodebug.soar.ui.UiTokens;
@@ -43,6 +45,9 @@ public class MorphCursor {
 	private static final double SIZE_OMEGA = 20.0D;
 	private static final double SIZE_DAMPING = 0.75D;
 
+	private static final float MAGNET_RADIUS = 44.0F;
+	private static final float MAGNET_MAX_PULL = 14.0F;
+
 	private final Spring x = new Spring(0.0D, POSITION_OMEGA, 1.0D);
 	private final Spring y = new Spring(0.0D, POSITION_OMEGA, 1.0D);
 	private final Spring width = new Spring(0.0D, SIZE_OMEGA, SIZE_DAMPING);
@@ -50,6 +55,33 @@ public class MorphCursor {
 	private final Spring radius = new Spring(0.0D, SIZE_OMEGA, SIZE_DAMPING);
 	private final Spring hoverAmount = new Spring(0.0D, 18.0D, 1.0D);
 	private final Spring pressAmount = new Spring(0.0D, 32.0D, 0.9D);
+
+	/**
+	 * A stack of rectangles that interactive content can live inside. Hovering is intersected
+	 * with the current clip, so a half-scrolled row or a panel that slides off screen can never
+	 * drag the ring outside the area that is actually visible.
+	 */
+	private static final class Clip {
+
+		private final float x, y, width, height;
+
+		private Clip(float x, float y, float width, float height) {
+			this.x = x;
+			this.y = y;
+			this.width = width;
+			this.height = height;
+		}
+	}
+
+	private final ArrayList<Clip> clipStack = new ArrayList<Clip>();
+	private float clipX, clipY, clipWidth, clipHeight;
+
+	private boolean magnetEnabled = true;
+	private float magnetStrength = 0.35F;
+	private boolean magnetCandidate;
+	private float magnetX, magnetY, magnetDistance;
+
+	private float holdProgress = -1.0F;
 
 	private boolean enabled;
 	private boolean visible;
@@ -146,8 +178,65 @@ public class MorphCursor {
 		this.hitY = mouseY;
 		this.hasHover = false;
 		this.tooltipText = null;
+		this.magnetCandidate = false;
+		this.holdProgress = -1.0F;
 
+		resetClip();
 		updatePrecisePosition(mouseX, mouseY);
+	}
+
+	/**
+	 * Constrains hover targets to a rectangle (in the same coordinates passed to
+	 * {@link #hover}). Push once around a list or panel and pop it afterwards.
+	 */
+	public void pushClip(float x, float y, float width, float height) {
+
+		clipStack.add(new Clip(clipX, clipY, clipWidth, clipHeight));
+
+		float left = Math.max(clipX, x);
+		float top = Math.max(clipY, y);
+		float right = Math.min(clipX + clipWidth, x + width);
+		float bottom = Math.min(clipY + clipHeight, y + height);
+
+		clipX = left;
+		clipY = top;
+		clipWidth = Math.max(0.0F, right - left);
+		clipHeight = Math.max(0.0F, bottom - top);
+	}
+
+	public void popClip() {
+
+		if (clipStack.isEmpty()) {
+			return;
+		}
+
+		Clip clip = clipStack.remove(clipStack.size() - 1);
+
+		clipX = clip.x;
+		clipY = clip.y;
+		clipWidth = clip.width;
+		clipHeight = clip.height;
+	}
+
+	private void resetClip() {
+
+		clipStack.clear();
+
+		Minecraft mc = Minecraft.getMinecraft();
+		ScaledResolution sr = new ScaledResolution(mc);
+
+		clipX = 0.0F;
+		clipY = 0.0F;
+		clipWidth = sr.getScaledWidth();
+		clipHeight = sr.getScaledHeight();
+	}
+
+	/**
+	 * Draws a progress arc around the pointer. Set it every frame while a destructive action is
+	 * being held; the value is cleared at the start of the next frame.
+	 */
+	public void setHoldProgress(float progress) {
+		this.holdProgress = Math.max(0.0F, Math.min(1.0F, progress));
 	}
 
 	/**
@@ -166,13 +255,26 @@ public class MorphCursor {
 			return;
 		}
 
-		if (hitX > x && hitX < x + width && hitY > y && hitY < y + height) {
+		// Intersect with the current clip first. A row that is half scrolled out of a list
+		// should only be hoverable over the part that is still on screen.
+		float left = Math.max(x, clipX);
+		float top = Math.max(y, clipY);
+		float right = Math.min(x + width, clipX + clipWidth);
+		float bottom = Math.min(y + height, clipY + clipHeight);
+
+		if (right <= left || bottom <= top) {
+			return;
+		}
+
+		registerMagnetCandidate(left, top, right, bottom);
+
+		if (hitX > left && hitX < right && hitY > top && hitY < bottom) {
 			this.hasHover = true;
 
-			this.hoverX = x;
-			this.hoverY = y;
-			this.hoverWidth = width;
-			this.hoverHeight = height;
+			this.hoverX = left;
+			this.hoverY = top;
+			this.hoverWidth = right - left;
+			this.hoverHeight = bottom - top;
 			this.hoverRadius = radius;
 
 			if (tooltip != null) {
@@ -184,6 +286,23 @@ public class MorphCursor {
 
 				tooltipText = tooltip;
 			}
+		}
+	}
+
+	private void registerMagnetCandidate(float left, float top, float right, float bottom) {
+		float dx = Math.max(left - preciseX, Math.max(0.0F, preciseX - right));
+		float dy = Math.max(top - preciseY, Math.max(0.0F, preciseY - bottom));
+		float distance = (float) Math.sqrt((dx * dx) + (dy * dy));
+
+		if (distance > MAGNET_RADIUS) {
+			return;
+		}
+
+		if (!magnetCandidate || distance < magnetDistance) {
+			magnetCandidate = true;
+			magnetDistance = distance;
+			magnetX = (left + right) / 2.0F;
+			magnetY = (top + bottom) / 2.0F;
 		}
 	}
 
@@ -269,6 +388,13 @@ public class MorphCursor {
 
 		float alpha = globalAlpha;
 
+		InternalSettingsMod internal = InternalSettingsMod.getInstance();
+
+		if (internal != null) {
+			magnetEnabled = internal.getMagneticCursorSetting().isToggled();
+			magnetStrength = internal.getMagnetStrengthSetting().getValueFloat();
+		}
+
 		// The idle ring grows out of nothing while the screen fades in, which hides the
 		// first frame where the springs are still at their initial position.
 		float diameter = IDLE_DIAMETER * (0.55F + 0.45F * alpha);
@@ -286,8 +412,21 @@ public class MorphCursor {
 			hoverAmount.setTarget(1.0D);
 		} else {
 
-			x.setTarget(preciseX - (diameter / 2.0F));
-			y.setTarget(preciseY - (diameter / 2.0F));
+			float pullX = 0.0F;
+			float pullY = 0.0F;
+
+			if (magnetEnabled && magnetStrength > 0.001F && magnetCandidate && magnetDistance > 0.0F) {
+
+				float falloff = 1.0F - Math.min(1.0F, magnetDistance / MAGNET_RADIUS);
+
+				diameter *= 1.0F + (0.18F * falloff * magnetStrength);
+
+				pullX = clampPull((magnetX - preciseX) * magnetStrength * falloff);
+				pullY = clampPull((magnetY - preciseY) * magnetStrength * falloff);
+			}
+
+			x.setTarget(preciseX + pullX - (diameter / 2.0F));
+			y.setTarget(preciseY + pullY - (diameter / 2.0F));
 			width.setTarget(diameter);
 			height.setTarget(diameter);
 			radius.setTarget(diameter / 2.0F);
@@ -296,6 +435,10 @@ public class MorphCursor {
 		}
 
 		pressAmount.setTarget(pressed ? 1.0D : 0.0D);
+	}
+
+	private float clampPull(float pull) {
+		return Math.max(-MAGNET_MAX_PULL, Math.min(MAGNET_MAX_PULL, pull));
 	}
 
 	private void snapSprings() {
@@ -353,6 +496,15 @@ public class MorphCursor {
 
 		// A precise dot keeps pointing exact even though the ring lags behind.
 		nvg.drawCircle(preciseX, preciseY, 1.5F + (0.35F * press), new Color(255, 255, 255, clampAlpha((int) (235.0F * alpha))));
+
+		if (holdProgress > 0.001F) {
+
+			float holdAlpha = Math.max(0.35F, alpha);
+
+			nvg.drawArc(preciseX, preciseY, 13.0F, 0.0F, 360.0F, 2.0F, new Color(255, 255, 255, clampAlpha((int) (40.0F * holdAlpha))));
+			nvg.drawArc(preciseX, preciseY, 13.0F, -90.0F, -90.0F + (360.0F * holdProgress), 2.6F,
+					ColorUtils.applyAlpha(accentColor.getInterpolateColor(), clampAlpha((int) (235.0F * holdAlpha))));
+		}
 
 		long tooltipDelayNanos = UiTokens.TOOLTIP_DELAY_MS * 1_000_000L;
 		long elapsed = System.nanoTime() - tooltipStartNanos;

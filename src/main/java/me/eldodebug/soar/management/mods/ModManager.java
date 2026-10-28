@@ -49,6 +49,7 @@ public class ModManager {
 		mods.add(new DamageTintMod());
 		mods.add(new DayCounterMod());
 		mods.add(new DiscordRPCMod());
+		mods.add(new DynamicCrosshairMod());
 		mods.add(new EarsMod());
 		mods.add(new EntityCullingMod());
 		mods.add(new FarCameraMod());
@@ -106,6 +107,7 @@ public class ModManager {
 		mods.add(new PotionStatusMod());
 		mods.add(new ProjectileTrailMod());
 		mods.add(new QuickSwitchMod());
+		mods.add(new RadialMenuMod());
 		mods.add(new RawInputMod());
 		mods.add(new ReachCirclesMod());
 		mods.add(new ReachDisplayMod());

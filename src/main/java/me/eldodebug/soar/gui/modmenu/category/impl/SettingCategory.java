@@ -4,7 +4,6 @@ import java.awt.*;
 import java.util.ArrayList;
 
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.AdvancedScene;
-import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.ClickTriplerScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.GeneralScene;
 import org.lwjgl.input.Keyboard;
 
@@ -15,7 +14,6 @@ import me.eldodebug.soar.gui.modmenu.category.impl.setting.SettingScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.AppearanceScene;
 import me.eldodebug.soar.gui.modmenu.category.impl.setting.impl.LanguageScene;
 import me.eldodebug.soar.management.color.palette.ColorPalette;
-import me.eldodebug.soar.management.misc.ClickTripler;
 import me.eldodebug.soar.management.color.palette.ColorType;
 import me.eldodebug.soar.management.language.TranslateText;
 import me.eldodebug.soar.management.nanovg.NanoVGManager;
@@ -41,11 +39,8 @@ public class SettingCategory extends Category {
 		scenes.add(new LanguageScene(this));
 		scenes.add(new GeneralScene(this));
 		
-		// The helper only exists on Linux; there is no point offering a dead switch elsewhere.
-		if(ClickTripler.isSupported()) {
-			scenes.add(new ClickTriplerScene(this));
-		}
-		
+		// The click-tripler controls live at the bottom of Advanced so the settings rail stays
+		// focused on the client rather than on an optional external helper.
 		scenes.add(new AdvancedScene(this));
 	}
 	
@@ -159,6 +154,10 @@ public class SettingCategory extends Category {
 		}
 	}
 	
+	public boolean isSceneSettled() {
+		return sceneAnimation != null && sceneAnimation.isDone(Direction.BACKWARDS);
+	}
+
 	public int getSceneX() {
 		return getX() + 15;
 	}
